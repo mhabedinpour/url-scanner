@@ -1,0 +1,46 @@
+version: "2"
+
+run:
+  timeout: 10m
+
+output:
+  formats:
+    code-climate:
+      path: gl-code-quality-report.json
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+linters:
+  default: all
+  disable:
+    - arangolint
+    - wsl
+    - depguard
+    - revive
+    - wsl_v5
+    - mnd
+    - varnamelen
+    - noinlineerr
+    - funlen
+    - exhaustruct
+    - gochecknoinits
+    - err113
+    - paralleltest
+    - ireturn
+    - godox
+    - nilnil
+    - forcetypeassert
+    - iface
+  settings:
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+        - captLocal
+    cyclop:
+      max-complexity: 15
+    wrapcheck:
+      ignore-package-globs:
+        - go.uber.org/multierr

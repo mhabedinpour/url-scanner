@@ -1,0 +1,43 @@
+# URL Scanner Service Configuration
+# This is a sample configuration file generated based on the Config struct
+
+# Environment specifies the current running environment (development, production, etc.)
+environment: development
+
+# HTTP server configuration
+http:
+  # Address and port the HTTP server will listen on
+  addr: ":8080"
+  # Maximum duration for reading the entire request, including the body
+  readTimeout: 1m
+  # Amount of time allowed to read request headers
+  readHeaderTimeout: 10s
+  # Maximum duration before timing out writes of the response
+  writeTimeout: 2m
+  # Maximum amount of time to wait for the next request when keep-alives are enabled
+  idleTimeout: 2m
+  # Maximum time allowed for processing a single request
+  requestTimeout: 10s
+  # Maximum number of bytes the server will read parsing the request header
+  maxHeaderBytes: 0
+  # URL path where metrics are exposed
+  metricsPath: /metrics
+
+# Database connection configuration
+database:
+  # Database authentication credentials
+  username: myuser
+  password: mypassword
+  # Database server connection details
+  host: localhost
+  port: 5432
+  sslMode: disable
+  name: mydatabase
+  # Connection pool settings
+  maxOpenConnections: 10
+  maxIdleConnections: 8
+  connMaxLifetime: 3m
+  connMaxIdleTime: 3m
+
+# Maximum duration to wait for ongoing requests to complete during shutdown
+gracefulShutdownTimeout: 30s
