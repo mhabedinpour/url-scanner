@@ -9,8 +9,8 @@ import (
 	"scanner/internal/api/handler/v1handler"
 	"scanner/internal/config"
 	"scanner/internal/scanner"
+	"scanner/internal/worker"
 	"scanner/pkg/logger"
-	"scanner/pkg/storage"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -19,12 +19,8 @@ import (
 
 // setupServer configures and starts the HTTP server asynchronously and returns
 // a function that gracefully shuts it down using the provided context.
-func setupServer(ctx context.Context, cfg *config.Config, strg storage.Storage) func(ctx context.Context) {
-	server, err := api.NewServer(api.Deps{
-		Deps: v1handler.Deps{
-			Scanner: scanner.New(strg),
-		},
-	}, api.NewOptions(cfg))
+func setupServer(ctx context.Context, cfg *config.Config, deps api.Deps) func(ctx context.Context) {
+	server, err := api.NewServer(ctx, deps, api.NewOptions(cfg))
 	if err != nil {
 		logger.Fatal(ctx, "could not create webserver", zap.Error(err))
 	}
@@ -58,7 +54,17 @@ func scanCommand(cfg *config.Config) *cobra.Command {
 			strg, closeStrg := getPostgres(ctx, cfg)
 			defer closeStrg()
 
-			stopWebserver := setupServer(ctx, cfg, strg)
+			workerClient, err := worker.Start(ctx, strg.Pool)
+			if err != nil {
+				logger.Fatal(ctx, "could not start worker", zap.Error(err))
+			}
+
+			stopWebserver := setupServer(ctx, cfg, api.Deps{
+				Deps: v1handler.Deps{
+					Scanner: scanner.New(strg),
+				},
+				WorkerClient: workerClient,
+			})
 
 			// wait for interrupt
 			<-ctx.Done()
@@ -66,6 +72,11 @@ func scanCommand(cfg *config.Config) *cobra.Command {
 			defer cancel()
 
 			stopWebserver(shutdownCtx)
+
+			logger.Info(ctx, "stopping worker...")
+			if err := workerClient.Stop(shutdownCtx); err != nil {
+				logger.Warn(ctx, "could not stop worker", zap.Error(err))
+			}
 		},
 	}
 

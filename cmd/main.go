@@ -18,7 +18,7 @@ import (
 // getPostgres creates a PostgreSQL client using configuration values and returns it
 // along with a cleanup function to close the connection pool.
 func getPostgres(ctx context.Context, cfg *config.Config) (*postgres.PgSQL, func()) {
-	pgsql, err := postgres.New(postgres.Options{
+	pgsql, err := postgres.New(ctx, postgres.Options{
 		Username:           cfg.Database.Username,
 		Password:           cfg.Database.Password,
 		Host:               cfg.Database.Host,

@@ -9,7 +9,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 // Options defines the configuration parameters for PostgreSQL database connection.
@@ -63,19 +64,19 @@ type PgSQL struct {
 	DB DB
 	// Builder is the goqu handle used to construct SQL queries bound to DB.
 	Builder Builder
+	// Pool is the underlying pgx connection Pool used by this storage.
+	Pool *pgxpool.Pool
 }
 
-// Close closes the underlying *sql.DB connection pool. It returns
-// storage.ErrAlreadyInTx if called on a transactional PgSQL (i.e., when DB is
-// a *sql.Tx).
+// Close closes the underlying pgx connection pool.
 func (p *PgSQL) Close() error {
-	db, ok := p.DB.(*sql.DB)
-	if !ok {
-		return storage.ErrAlreadyInTx
+	// Close the pgx Pool if present
+	if p.Pool != nil {
+		p.Pool.Close()
 	}
-
-	if err := db.Close(); err != nil {
-		return fmt.Errorf("could not close db: %w", err)
+	// Also close the *sql.DB wrapper if present (best effort)
+	if db, ok := p.DB.(*sql.DB); ok {
+		_ = db.Close()
 	}
 
 	return nil
@@ -153,29 +154,44 @@ func (p *PgSQL) WithTx(ctx context.Context, cb func(storage storage.AllStorage) 
 	return nil
 }
 
-// New creates a new PostgreSQL storage instance backed by a connection pool
-// configured via Options.
-func New(options Options) (*PgSQL, error) {
-	dbUrl := fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s sslmode=%s",
+// New creates a new PostgreSQL storage instance backed by pgxpool, and a
+// database/sql wrapper for compatibility with goqu and migrations.
+func New(ctx context.Context, options Options) (*PgSQL, error) {
+	connStr := fmt.Sprintf("host=%s port=%d user=%s dbname=%s password=%s sslmode=%s",
 		options.Host,
 		options.Port,
 		options.Username,
 		options.Database,
 		options.Password,
 		options.SslMode)
-
-	db, err := sql.Open("postgres", dbUrl)
+	cfg, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
-		return nil, fmt.Errorf("could not open sql connection: %w", err)
+		return nil, fmt.Errorf("could not parse pgxpool config: %w", err)
+	}
+	if options.MaxOpenConnections > 0 {
+		cfg.MaxConns = int32(options.MaxOpenConnections) //nolint: gosec
+	}
+	if options.MaxIdleConnections > 0 {
+		cfg.MinConns = int32(options.MaxIdleConnections) //nolint: gosec
+	}
+	if options.ConnMaxLifetime > 0 {
+		cfg.MaxConnLifetime = options.ConnMaxLifetime
+	}
+	if options.ConnMaxIdleTime > 0 {
+		cfg.MaxConnIdleTime = options.ConnMaxIdleTime
 	}
 
-	db.SetMaxIdleConns(options.MaxIdleConnections)
-	db.SetMaxOpenConns(options.MaxOpenConnections)
-	db.SetConnMaxLifetime(options.ConnMaxLifetime)
-	db.SetConnMaxIdleTime(options.ConnMaxIdleTime)
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not create pgx Pool: %w", err)
+	}
+
+	// wrap the pool with a *sql.DB to keep compatibility with goqu and goose
+	sqlDB := stdlib.OpenDBFromPool(pool)
 
 	return &PgSQL{
-		DB:      db,
-		Builder: goqu.Dialect("postgres").DB(db),
+		DB:      sqlDB,
+		Builder: goqu.Dialect("postgres").DB(sqlDB),
+		Pool:    pool,
 	}, nil
 }

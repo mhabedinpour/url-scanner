@@ -3,20 +3,27 @@
 package api
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"scanner/internal/api/handler/v1handler"
 	"scanner/internal/api/specs/v1specs"
 	"scanner/internal/config"
 	"scanner/pkg/controller"
+	"scanner/pkg/logger"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/riverqueue/river"
 	"github.com/swaggest/swgui/v5emb"
 	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.uber.org/zap/exp/zapslog"
+	"riverqueue.com/riverui"
 )
 
 // v1Spec contains the embedded OpenAPI specification for version 1 of the API.
@@ -70,6 +77,8 @@ func NewOptions(cfg *config.Config) Options {
 
 type Deps struct {
 	v1handler.Deps
+
+	WorkerClient *river.Client[pgx.Tx]
 }
 
 // NewServer wires up and returns a configured *http.Server using the provided Options.
@@ -79,8 +88,9 @@ type Deps struct {
 // - Embedded OpenAPI v1 spec and Swagger UI
 // - v1 API routes backed by generated server and handlers
 // - pprof endpoints for profiling
+// - RiverQueue UI
 // It also wraps the mux with CORS and logging middlewares and applies a request timeout.
-func NewServer(deps Deps, opts Options) (*http.Server, error) {
+func NewServer(ctx context.Context, deps Deps, opts Options) (*http.Server, error) {
 	mux := http.NewServeMux()
 
 	// prometheus metrics server
@@ -117,6 +127,22 @@ func NewServer(deps Deps, opts Options) (*http.Server, error) {
 		return nil, fmt.Errorf("could not create v1 api server: %w", err)
 	}
 	mux.Handle("/v1/", v1Srv)
+
+	// river queue ui
+	riverEndpoints := riverui.NewEndpoints(deps.WorkerClient, nil)
+	riverHandler, err := riverui.NewHandler(&riverui.HandlerOpts{
+		DevMode:   false,
+		Endpoints: riverEndpoints,
+		Logger:    slog.New(zapslog.NewHandler(logger.Get(ctx).Core())),
+		Prefix:    "/riverui/",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not create river queue ui handler: %w", err)
+	}
+	if err := riverHandler.Start(ctx); err != nil {
+		return nil, fmt.Errorf("could not start river queue ui handler: %w", err)
+	}
+	mux.Handle("/riverui/", riverHandler)
 
 	// pprof
 	mux.Handle("/debug/pprof/", controller.PprofMux())

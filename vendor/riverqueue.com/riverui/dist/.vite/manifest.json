@@ -1,0 +1,39 @@
+{
+  "_dagrejs-CMpdV_vr.js": {
+    "file": "assets/dagrejs-CMpdV_vr.js",
+    "name": "dagrejs"
+  },
+  "_headlessui-VwhARqnD.js": {
+    "file": "assets/headlessui-VwhARqnD.js",
+    "name": "headlessui",
+    "imports": [
+      "_dagrejs-CMpdV_vr.js"
+    ]
+  },
+  "_react-dom-l0sNRNKZ.js": {
+    "file": "assets/react-dom-l0sNRNKZ.js",
+    "name": "react-dom"
+  },
+  "_reactflow-Bp81IsEW.js": {
+    "file": "assets/reactflow-Bp81IsEW.js",
+    "name": "reactflow",
+    "imports": [
+      "_headlessui-VwhARqnD.js",
+      "_dagrejs-CMpdV_vr.js"
+    ]
+  },
+  "src/main.tsx": {
+    "file": "assets/main-k5DI2Wbo.js",
+    "name": "main",
+    "src": "src/main.tsx",
+    "isEntry": true,
+    "imports": [
+      "_reactflow-Bp81IsEW.js",
+      "_headlessui-VwhARqnD.js",
+      "_dagrejs-CMpdV_vr.js"
+    ],
+    "css": [
+      "assets/main-as2xUAej.css"
+    ]
+  }
+}

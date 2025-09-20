@@ -84,7 +84,7 @@ func setupTestDB(t *testing.T) (*postgres.PgSQL, func()) {
 	require.NoError(t, err)
 
 	// create postgres instance
-	pgSQL, err := postgres.New(postgres.Options{
+	pgSQL, err := postgres.New(ctx, postgres.Options{
 		Username:           testUser,
 		Password:           testPassword,
 		Host:               pgContainer.Host,
