@@ -1,0 +1,209 @@
+openapi: 3.1.0
+info:
+  title: URL Scan Service
+  version: 1.0.0
+  description: >
+    API for submitting and retrieving URL security scans.
+    Versioned via path prefix (/v1).
+servers:
+  - url: http://localhost:8080/v1
+security:
+  - bearerAuth: []
+
+paths:
+  /scans:
+    post:
+      summary: Submit a URL for scanning
+      description: >
+        Starts an asynchronous scan for the given page URL. Returns a scan
+        resource with status `PENDING`.
+      operationId: createScan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScanRequest'
+            examples:
+              default:
+                value: { url: "https://example.com" }
+      responses:
+        '201':
+          description: Scan request accepted and created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Scan' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        default:
+          $ref: '#/components/responses/ServerError'
+
+    get:
+      summary: List scans for the authenticated user (cursor pagination)
+      description: >
+        Returns scans owned by the caller. Use `cursor` and `limit` for
+        pagination. The response includes `next_cursor` when more pages exist.
+      operationId: listScans
+      parameters:
+        - in: query
+          name: cursor
+          description: Opaque cursor from a previous response.
+          schema: { type: string, nullable: true }
+        - in: query
+          name: limit
+          description: Page size (max 100).
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - in: query
+          name: status
+          description: Optional filter by scan status.
+          schema: { $ref: '#/components/schemas/ScanStatus' }
+      responses:
+        '200':
+          description: A page of scans
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScanList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        default:
+          $ref: '#/components/responses/ServerError'
+
+  /scans/{id}:
+    get:
+      summary: Get a single scan
+      operationId: getScan
+      parameters:
+        - $ref: '#/components/parameters/ScanId'
+      responses:
+        '200':
+          description: Scan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Scan' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        default:
+          $ref: '#/components/responses/ServerError'
+
+    delete:
+      summary: Delete a scan
+      operationId: deleteScan
+      parameters:
+        - $ref: '#/components/parameters/ScanId'
+      responses:
+        '204':
+          description: Deleted
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        default:
+          $ref: '#/components/responses/ServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ScanId:
+      in: path
+      name: id
+      required: true
+      description: Scan identifier (UUID).
+      schema: { type: string, format: uuid }
+
+  responses:
+    BadRequest:
+      description: Invalid input
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ServerError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    CreateScanRequest:
+      type: object
+      required: [url]
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          format: uri
+
+    ScanStatus:
+      type: string
+      enum: [PENDING, COMPLETED, FAILED]
+
+    ScanResult:
+      type: object
+      required: [page, stats, verdicts]
+      properties:
+        page:
+          type: object
+          properties:
+            url:      { type: string, format: uri }
+            domain:   { type: string }
+            ip:       { type: string }
+            asn:      { type: string }
+            country:  { type: string }
+            server:   { type: string }
+            status:   { type: integer }
+            mimeType: { type: string }
+        verdicts:
+          type: object
+          properties:
+            malicious: { type: boolean }
+            score:     { type: integer }
+        stats:
+          type: object
+          properties:
+            malicious: { type: integer }
+
+    Scan:
+      type: object
+      required: [id, url, status, result, attempts, createdAt, updatedAt]
+      properties:
+        id:       { type: string, format: uuid }
+        url:      { type: string, format: uri }
+        status:   { $ref: '#/components/schemas/ScanStatus' }
+        result:   { $ref: '#/components/schemas/ScanResult' }
+        attempts: { type: integer, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ScanList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Scan' }
+        next_cursor:
+          type: string
+          nullable: true
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:    { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }

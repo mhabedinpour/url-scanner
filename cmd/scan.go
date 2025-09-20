@@ -5,27 +5,28 @@ import (
 	"errors"
 	"net/http"
 	"os/signal"
+	"scanner/internal/api"
 	"scanner/internal/config"
 	"scanner/pkg/logger"
 	"syscall"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
-// setupMetricsServer creates and configures an HTTP server for exposing metrics.
-func setupMetricsServer(ctx context.Context, cfg *config.Config) func(ctx context.Context) {
-	mux := http.NewServeMux()
-	mux.Handle(cfg.HTTP.MetricsPath, promhttp.Handler())
-	server := &http.Server{
+func setupServer(ctx context.Context, cfg *config.Config) func(ctx context.Context) {
+	server, err := api.NewServer(api.Options{
 		Addr:              cfg.HTTP.Addr,
-		Handler:           mux,
 		ReadTimeout:       cfg.HTTP.ReadTimeout,
 		ReadHeaderTimeout: cfg.HTTP.ReadHeaderTimeout,
 		WriteTimeout:      cfg.HTTP.WriteTimeout,
 		IdleTimeout:       cfg.HTTP.IdleTimeout,
+		RequestTimeout:    cfg.HTTP.RequestTimeout,
 		MaxHeaderBytes:    cfg.HTTP.MaxHeaderBytes,
+		MetricsPath:       cfg.HTTP.MetricsPath,
+	})
+	if err != nil {
+		logger.Fatal(ctx, "could not create webserver", zap.Error(err))
 	}
 
 	go func() {
@@ -52,7 +53,7 @@ func scanCommand(cfg *config.Config) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
-			stopMetricsServer := setupMetricsServer(ctx, cfg)
+			stopWebserver := setupServer(ctx, cfg)
 
 			_, closeStrg := getPostgres(ctx, cfg)
 			defer closeStrg()
@@ -62,7 +63,7 @@ func scanCommand(cfg *config.Config) *cobra.Command {
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.GracefulShutdownTimeout)
 			defer cancel()
 
-			stopMetricsServer(shutdownCtx)
+			stopWebserver(shutdownCtx)
 		},
 	}
 

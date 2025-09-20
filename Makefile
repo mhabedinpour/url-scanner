@@ -2,11 +2,11 @@
 # Dependency related commands
 ################################
 .PHONY: dependency
-dependency: install-golangci-lint install-mockgen install-goimports
+dependency: install-golangci-lint install-mockgen install-goimports install-ogen
 
 .PHONY: install-mockgen
 install-mockgen:
-	go install go.uber.org/mock/mockgen@v0.5.2
+	go install go.uber.org/mock/mockgen@v0.6.0
 
 .PHONY: install-golangci-lint
 install-golangci-lint:
@@ -15,6 +15,10 @@ install-golangci-lint:
 .PHONY: install-goimports
 install-goimports:
 	go install golang.org/x/tools/cmd/goimports@v0.35.0
+
+.PHONY: install-ogen
+install-ogen:
+	go install github.com/ogen-go/ogen/cmd/ogen@v1.14.0
 
 ################################
 # CI related commands
