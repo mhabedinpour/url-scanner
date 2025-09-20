@@ -108,18 +108,18 @@ func (mr *MockAllStorageMockRecorder) UpdatePendingScansByURL(ctx, URL, updates 
 }
 
 // UserScans mocks base method.
-func (m *MockAllStorage) UserScans(ctx context.Context, userID domain.UserID, cursor time.Time, limit uint) (storage.UserScans, error) {
+func (m *MockAllStorage) UserScans(ctx context.Context, userID domain.UserID, status domain.ScanStatus, cursor time.Time, limit uint) (storage.UserScans, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UserScans", ctx, userID, cursor, limit)
+	ret := m.ctrl.Call(m, "UserScans", ctx, userID, status, cursor, limit)
 	ret0, _ := ret[0].(storage.UserScans)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UserScans indicates an expected call of UserScans.
-func (mr *MockAllStorageMockRecorder) UserScans(ctx, userID, cursor, limit any) *gomock.Call {
+func (mr *MockAllStorageMockRecorder) UserScans(ctx, userID, status, cursor, limit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserScans", reflect.TypeOf((*MockAllStorage)(nil).UserScans), ctx, userID, cursor, limit)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserScans", reflect.TypeOf((*MockAllStorage)(nil).UserScans), ctx, userID, status, cursor, limit)
 }
 
 // MockTxStorage is a mock of TxStorage interface.
@@ -239,18 +239,18 @@ func (mr *MockTxStorageMockRecorder) UpdatePendingScansByURL(ctx, URL, updates a
 }
 
 // UserScans mocks base method.
-func (m *MockTxStorage) UserScans(ctx context.Context, userID domain.UserID, cursor time.Time, limit uint) (storage.UserScans, error) {
+func (m *MockTxStorage) UserScans(ctx context.Context, userID domain.UserID, status domain.ScanStatus, cursor time.Time, limit uint) (storage.UserScans, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UserScans", ctx, userID, cursor, limit)
+	ret := m.ctrl.Call(m, "UserScans", ctx, userID, status, cursor, limit)
 	ret0, _ := ret[0].(storage.UserScans)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UserScans indicates an expected call of UserScans.
-func (mr *MockTxStorageMockRecorder) UserScans(ctx, userID, cursor, limit any) *gomock.Call {
+func (mr *MockTxStorageMockRecorder) UserScans(ctx, userID, status, cursor, limit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserScans", reflect.TypeOf((*MockTxStorage)(nil).UserScans), ctx, userID, cursor, limit)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserScans", reflect.TypeOf((*MockTxStorage)(nil).UserScans), ctx, userID, status, cursor, limit)
 }
 
 // MockStorage is a mock of Storage interface.
@@ -371,18 +371,18 @@ func (mr *MockStorageMockRecorder) UpdatePendingScansByURL(ctx, URL, updates any
 }
 
 // UserScans mocks base method.
-func (m *MockStorage) UserScans(ctx context.Context, userID domain.UserID, cursor time.Time, limit uint) (storage.UserScans, error) {
+func (m *MockStorage) UserScans(ctx context.Context, userID domain.UserID, status domain.ScanStatus, cursor time.Time, limit uint) (storage.UserScans, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UserScans", ctx, userID, cursor, limit)
+	ret := m.ctrl.Call(m, "UserScans", ctx, userID, status, cursor, limit)
 	ret0, _ := ret[0].(storage.UserScans)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UserScans indicates an expected call of UserScans.
-func (mr *MockStorageMockRecorder) UserScans(ctx, userID, cursor, limit any) *gomock.Call {
+func (mr *MockStorageMockRecorder) UserScans(ctx, userID, status, cursor, limit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserScans", reflect.TypeOf((*MockStorage)(nil).UserScans), ctx, userID, cursor, limit)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserScans", reflect.TypeOf((*MockStorage)(nil).UserScans), ctx, userID, status, cursor, limit)
 }
 
 // WithTx mocks base method.

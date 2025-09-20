@@ -17,7 +17,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestNewError_InternalOnPlainError(t *testing.T) {
-	h := v1handler.New()
+	h := v1handler.New(v1handler.Deps{})
 	ctx := context.Background()
 
 	res := h.NewError(ctx, errors.New("boom"))
@@ -36,7 +36,7 @@ func TestNewError_InternalOnPlainError(t *testing.T) {
 }
 
 func TestNewError_KindSentinelDirect_NotFound(t *testing.T) {
-	h := v1handler.New()
+	h := v1handler.New(v1handler.Deps{})
 	ctx := context.Background()
 
 	// Pass the Kind sentinel directly
@@ -53,7 +53,7 @@ func TestNewError_KindSentinelDirect_NotFound(t *testing.T) {
 }
 
 func TestNewError_SemanticWithMessage_BadRequest(t *testing.T) {
-	h := v1handler.New()
+	h := v1handler.New(v1handler.Deps{})
 	ctx := context.Background()
 
 	err := serrors.With(serrors.ErrBadRequest, "invalid payload: missing url")
@@ -70,7 +70,7 @@ func TestNewError_SemanticWithMessage_BadRequest(t *testing.T) {
 }
 
 func TestNewError_SemanticWrap_Unauthorized(t *testing.T) {
-	h := v1handler.New()
+	h := v1handler.New(v1handler.Deps{})
 	ctx := context.Background()
 
 	cause := errors.New("bad token")
@@ -89,7 +89,7 @@ func TestNewError_SemanticWrap_Unauthorized(t *testing.T) {
 }
 
 func TestNewError_InternalKind_GeneratesInternal(t *testing.T) {
-	h := v1handler.New()
+	h := v1handler.New(v1handler.Deps{})
 	ctx := context.Background()
 
 	res := h.NewError(ctx, serrors.KindOnly(serrors.ErrInternal))

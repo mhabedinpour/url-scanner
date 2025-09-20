@@ -6,8 +6,11 @@ import (
 	"net/http"
 	"os/signal"
 	"scanner/internal/api"
+	"scanner/internal/api/handler/v1handler"
 	"scanner/internal/config"
+	"scanner/internal/scanner"
 	"scanner/pkg/logger"
+	"scanner/pkg/storage"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -16,8 +19,12 @@ import (
 
 // setupServer configures and starts the HTTP server asynchronously and returns
 // a function that gracefully shuts it down using the provided context.
-func setupServer(ctx context.Context, cfg *config.Config) func(ctx context.Context) {
-	server, err := api.NewServer(api.NewOptions(cfg))
+func setupServer(ctx context.Context, cfg *config.Config, strg storage.Storage) func(ctx context.Context) {
+	server, err := api.NewServer(api.Deps{
+		Deps: v1handler.Deps{
+			Scanner: scanner.New(strg),
+		},
+	}, api.NewOptions(cfg))
 	if err != nil {
 		logger.Fatal(ctx, "could not create webserver", zap.Error(err))
 	}
@@ -48,10 +55,10 @@ func scanCommand(cfg *config.Config) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
-			stopWebserver := setupServer(ctx, cfg)
-
-			_, closeStrg := getPostgres(ctx, cfg)
+			strg, closeStrg := getPostgres(ctx, cfg)
 			defer closeStrg()
+
+			stopWebserver := setupServer(ctx, cfg, strg)
 
 			// wait for interrupt
 			<-ctx.Done()

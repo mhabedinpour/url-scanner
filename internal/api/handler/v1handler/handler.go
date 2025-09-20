@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"scanner/internal/api/specs/v1specs"
+	"scanner/internal/scanner"
 	"scanner/pkg/logger"
 	"scanner/pkg/serrors"
 
@@ -15,15 +16,24 @@ import (
 	"go.uber.org/zap"
 )
 
+// Deps lists all dependencies of the Handler.
+type Deps struct {
+	Scanner scanner.Scanner
+}
+
 // Handler implements v1specs.Handler and provides endpoint methods for the v1 API.
-type Handler struct{}
+type Handler struct {
+	deps Deps
+}
 
 // Ensure Handler implements v1specs.Handler.
 var _ v1specs.Handler = (*Handler)(nil)
 
 // New constructs and returns a new Handler instance.
-func New() *Handler {
-	return &Handler{}
+func New(deps Deps) *Handler {
+	return &Handler{
+		deps: deps,
+	}
 }
 
 // NewError maps internal errors into an API-friendly error response with an HTTP status code.

@@ -26,7 +26,7 @@ const (
 // ScanResult holds the normalized outcome of a URL scan, including
 // page metadata, a verdict, and aggregated stats.
 type ScanResult struct {
-	Page struct {
+	Page *struct {
 		URL      string `json:"url,omitempty"`
 		Domain   string `json:"domain,omitempty"`
 		IP       string `json:"ip,omitempty"`
@@ -35,16 +35,16 @@ type ScanResult struct {
 		Server   string `json:"server,omitempty"`
 		Status   int    `json:"status,omitempty"`
 		MimeType string `json:"mimeType,omitempty"`
-	} `json:"page"`
+	} `json:"page,omitempty"`
 
-	Verdict struct {
+	Verdict *struct {
 		Malicious bool `json:"malicious,omitempty"`
 		Score     int  `json:"score,omitempty"`
 	} `json:"verdicts,omitempty"`
 
-	Stats struct {
+	Stats *struct {
 		Malicious int `json:"malicious,omitempty"`
-	} `json:"stats"`
+	} `json:"stats,omitempty"`
 }
 
 // Scan represents a single URL scan request and its current state.

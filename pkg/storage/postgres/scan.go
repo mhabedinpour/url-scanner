@@ -101,11 +101,15 @@ func (p *PgSQL) DeleteScan(ctx context.Context, userID domain.UserID, id domain.
 // Results are ordered by created_at DESC, id DESC. Returns next and previous cursors for pagination.
 func (p *PgSQL) UserScans(ctx context.Context,
 	userID domain.UserID,
+	status domain.ScanStatus,
 	cursor time.Time,
 	limit uint) (storage.UserScans, error) {
 	w := []goqu.Expression{
 		goqu.I("user_id").Eq(uuid.UUID(userID)),
 		goqu.I("deleted_at").IsNull(),
+	}
+	if status != "" {
+		w = append(w, goqu.I("status").Eq(string(status)))
 	}
 	if !cursor.IsZero() {
 		w = append(w, goqu.I("created_at").Lt(cursor))

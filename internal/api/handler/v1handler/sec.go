@@ -7,6 +7,7 @@ import (
 	"scanner/internal/api/specs/v1specs"
 	"scanner/internal/config"
 	"scanner/pkg/controller"
+	"scanner/pkg/domain"
 	"scanner/pkg/serrors"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -35,8 +36,8 @@ const UserIDKey controller.CtxKey = "userID"
 // GetUserIDFromContext extracts the authenticated user's UUID from context.
 // It panics if the value is missing or of unexpected type, which should not
 // happen when the JWT middleware is correctly configured.
-func GetUserIDFromContext(ctx context.Context) uuid.UUID {
-	userID, ok := ctx.Value(UserIDKey).(uuid.UUID)
+func GetUserIDFromContext(ctx context.Context) domain.UserID {
+	userID, ok := ctx.Value(UserIDKey).(domain.UserID)
 	if !ok {
 		// should happen because of the jwt middleware
 		panic("userID not found in context")
@@ -96,5 +97,5 @@ func (s SecHandler) HandleBearerAuth(
 		return ctx, serrors.With(serrors.ErrUnauthorized, "invalid subject")
 	}
 
-	return context.WithValue(ctx, UserIDKey, userID), nil
+	return context.WithValue(ctx, UserIDKey, domain.UserID(userID)), nil
 }

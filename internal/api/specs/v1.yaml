@@ -179,7 +179,7 @@ components:
 
     Scan:
       type: object
-      required: [id, url, status, result, attempts, createdAt, updatedAt]
+      required: [id, url, status, result, attempts, createdAt]
       properties:
         id:       { type: string, format: uuid }
         url:      { type: string, format: uri }

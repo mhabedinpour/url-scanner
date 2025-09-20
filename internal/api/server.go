@@ -68,6 +68,10 @@ func NewOptions(cfg *config.Config) Options {
 	}
 }
 
+type Deps struct {
+	v1handler.Deps
+}
+
 // NewServer wires up and returns a configured *http.Server using the provided Options.
 // It sets up:
 // - Prometheus metrics endpoint (MetricsPath)
@@ -76,7 +80,7 @@ func NewOptions(cfg *config.Config) Options {
 // - v1 API routes backed by generated server and handlers
 // - pprof endpoints for profiling
 // It also wraps the mux with CORS and logging middlewares and applies a request timeout.
-func NewServer(opts Options) (*http.Server, error) {
+func NewServer(deps Deps, opts Options) (*http.Server, error) {
 	mux := http.NewServeMux()
 
 	// prometheus metrics server
@@ -105,7 +109,7 @@ func NewServer(opts Options) (*http.Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not create sec handler: %w", err)
 	}
-	v1Srv, err := v1specs.NewServer(v1handler.New(),
+	v1Srv, err := v1specs.NewServer(v1handler.New(deps.Deps),
 		secHandler,
 		v1specs.WithMeterProvider(mp),
 		v1specs.WithPathPrefix("/v1"))

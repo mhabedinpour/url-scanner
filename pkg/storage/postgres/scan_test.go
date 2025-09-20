@@ -98,7 +98,7 @@ func TestPgSQL_UpdatePendingScansByURL(t *testing.T) {
 	require.NoError(t, pgSQL.UpdatePendingScansByURL(ctx, urlA, u))
 
 	// fetch all user scans and validate
-	page, err := pgSQL.UserScans(ctx, userID, time.Time{}, 50)
+	page, err := pgSQL.UserScans(ctx, userID, domain.ScanStatus(""), time.Time{}, 50)
 	require.NoError(t, err)
 
 	// build index by id
@@ -147,7 +147,7 @@ func TestPgSQL_DeleteScan(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, got)
 	// listing should not include it
-	page, err := pgSQL.UserScans(ctx, userID, time.Time{}, 10)
+	page, err := pgSQL.UserScans(ctx, userID, domain.ScanStatus(""), time.Time{}, 10)
 	require.NoError(t, err)
 	for _, sc := range page.Scans {
 		require.NotEqual(t, id, sc.ID)
@@ -185,21 +185,21 @@ func TestPgSQL_UserScans_Pagination(t *testing.T) {
 	}
 
 	// first page, limit 2
-	p1, err := pgSQL.UserScans(ctx, userID, time.Time{}, 2)
+	p1, err := pgSQL.UserScans(ctx, userID, domain.ScanStatus(""), time.Time{}, 2)
 	require.NoError(t, err)
 	require.Len(t, p1.Scans, 2)
 	require.NotNil(t, p1.NextCursor)
 	c1 := *p1.NextCursor
 
 	// second page
-	p2, err := pgSQL.UserScans(ctx, userID, c1, 2)
+	p2, err := pgSQL.UserScans(ctx, userID, domain.ScanStatus(""), c1, 2)
 	require.NoError(t, err)
 	require.Len(t, p2.Scans, 2)
 	require.NotNil(t, p2.NextCursor)
 	c2 := *p2.NextCursor
 
 	// third (last) page, should have 1 left and no next cursor
-	p3, err := pgSQL.UserScans(ctx, userID, c2, 2)
+	p3, err := pgSQL.UserScans(ctx, userID, domain.ScanStatus(""), c2, 2)
 	require.NoError(t, err)
 	require.Len(t, p3.Scans, 1)
 	require.Nil(t, p3.NextCursor)

@@ -41,8 +41,13 @@ type ScanStorage interface {
 	// returns the deleted scan, or nil if it was not found.
 	DeleteScan(ctx context.Context, userID domain.UserID, ID domain.ScanID) (*domain.Scan, error)
 	// UserScans returns a page of scans for a user created before the optional
-	// cursor time, limited by the given limit.
-	UserScans(ctx context.Context, userID domain.UserID, cursor time.Time, limit uint) (UserScans, error)
+	// cursor time, limited by the given limit. If status is non-empty, results are
+	// filtered to records with the given status.
+	UserScans(ctx context.Context,
+		userID domain.UserID,
+		status domain.ScanStatus,
+		cursor time.Time,
+		limit uint) (UserScans, error)
 	// ScanByID fetches a scan by its ID for the given user, excluding soft-deleted
 	// records. Returns nil when not found.
 	ScanByID(ctx context.Context, userID domain.UserID, ID domain.ScanID) (*domain.Scan, error)

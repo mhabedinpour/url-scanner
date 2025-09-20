@@ -181,6 +181,52 @@ func (o OptBool) Or(d bool) bool {
 	return d
 }
 
+// NewOptDateTime returns new OptDateTime with value set to v.
+func NewOptDateTime(v time.Time) OptDateTime {
+	return OptDateTime{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDateTime is optional time.Time.
+type OptDateTime struct {
+	Value time.Time
+	Set   bool
+}
+
+// IsSet returns true if OptDateTime was set.
+func (o OptDateTime) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDateTime) Reset() {
+	var v time.Time
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDateTime) SetTo(v time.Time) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDateTime) Get() (v time.Time, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptErrorDetails returns new OptErrorDetails with value set to v.
 func NewOptErrorDetails(v ErrorDetails) OptErrorDetails {
 	return OptErrorDetails{
@@ -476,13 +522,13 @@ func (o OptURI) Or(d url.URL) url.URL {
 
 // Ref: #/components/schemas/Scan
 type Scan struct {
-	ID        uuid.UUID  `json:"id"`
-	URL       url.URL    `json:"url"`
-	Status    ScanStatus `json:"status"`
-	Result    ScanResult `json:"result"`
-	Attempts  int        `json:"attempts"`
-	CreatedAt time.Time  `json:"createdAt"`
-	UpdatedAt time.Time  `json:"updatedAt"`
+	ID        uuid.UUID   `json:"id"`
+	URL       url.URL     `json:"url"`
+	Status    ScanStatus  `json:"status"`
+	Result    ScanResult  `json:"result"`
+	Attempts  int         `json:"attempts"`
+	CreatedAt time.Time   `json:"createdAt"`
+	UpdatedAt OptDateTime `json:"updatedAt"`
 }
 
 // GetID returns the value of ID.
@@ -516,7 +562,7 @@ func (s *Scan) GetCreatedAt() time.Time {
 }
 
 // GetUpdatedAt returns the value of UpdatedAt.
-func (s *Scan) GetUpdatedAt() time.Time {
+func (s *Scan) GetUpdatedAt() OptDateTime {
 	return s.UpdatedAt
 }
 
@@ -551,7 +597,7 @@ func (s *Scan) SetCreatedAt(val time.Time) {
 }
 
 // SetUpdatedAt sets the value of UpdatedAt.
-func (s *Scan) SetUpdatedAt(val time.Time) {
+func (s *Scan) SetUpdatedAt(val OptDateTime) {
 	s.UpdatedAt = val
 }
 

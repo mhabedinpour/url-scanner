@@ -10,7 +10,7 @@ func WithCORS(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Allow-Headers",
 			"Content-Type, Content-Length, Accept-Encoding, Authorization, accept, origin, Cache-Control")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
 
 		// handle preflight requests quickly
 		if r.Method == http.MethodOptions {

@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"scanner/pkg/domain"
 	"testing"
 	"time"
 
@@ -79,11 +80,11 @@ func TestHandleBearerAuth_ValidToken(t *testing.T) {
 	if v == nil {
 		t.Fatalf("expected userID in context, got nil")
 	}
-	got, ok := v.(uuid.UUID)
+	got, ok := v.(domain.UserID)
 	if !ok {
 		t.Fatalf("userID in context has wrong type: %T", v)
 	}
-	if got != uid {
+	if got != domain.UserID(uid) {
 		t.Fatalf("userID mismatch, want %s, got %s", uid, got)
 	}
 }
