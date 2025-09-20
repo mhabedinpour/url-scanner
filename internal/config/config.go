@@ -58,6 +58,11 @@ type Config struct {
 		ConnMaxIdleTime time.Duration `env:"DATABASE_CONNECTION_MAX_IDLE_TIME" env-default:"3m" yaml:"connMaxIdleTime"`
 	} `yaml:"database"`
 
+	JWT struct {
+		PublicKey  string `env:"JWT_PUBLIC_KEY"  yaml:"publicKey"`
+		PrivateKey string `env:"JWT_PRIVATE_KEY" yaml:"privateKey"`
+	} `yaml:"jwt"`
+
 	// GracefulShutdownTimeout is the maximum duration to wait for ongoing requests to complete during shutdown
 	GracefulShutdownTimeout time.Duration `env:"GRACEFUL_SHUTDOWN_TIMEOUT" env-default:"10s" yaml:"gracefulShutdownTimeout"` //nolint: lll
 }

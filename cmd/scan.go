@@ -14,17 +14,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// setupServer configures and starts the HTTP server asynchronously and returns
+// a function that gracefully shuts it down using the provided context.
 func setupServer(ctx context.Context, cfg *config.Config) func(ctx context.Context) {
-	server, err := api.NewServer(api.Options{
-		Addr:              cfg.HTTP.Addr,
-		ReadTimeout:       cfg.HTTP.ReadTimeout,
-		ReadHeaderTimeout: cfg.HTTP.ReadHeaderTimeout,
-		WriteTimeout:      cfg.HTTP.WriteTimeout,
-		IdleTimeout:       cfg.HTTP.IdleTimeout,
-		RequestTimeout:    cfg.HTTP.RequestTimeout,
-		MaxHeaderBytes:    cfg.HTTP.MaxHeaderBytes,
-		MetricsPath:       cfg.HTTP.MetricsPath,
-	})
+	server, err := api.NewServer(api.NewOptions(cfg))
 	if err != nil {
 		logger.Fatal(ctx, "could not create webserver", zap.Error(err))
 	}
@@ -46,6 +39,8 @@ func setupServer(ctx context.Context, cfg *config.Config) func(ctx context.Conte
 	}
 }
 
+// scanCommand constructs the 'scan' subcommand that runs the API server and
+// background workers until interrupted.
 func scanCommand(cfg *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scan",

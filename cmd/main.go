@@ -1,3 +1,5 @@
+// Package main provides the CLI entrypoint for the URL Scanner service.
+// It wires subcommands (scan, migrate, jwt), loads configuration, and initializes logging.
 package main
 
 import (
@@ -13,6 +15,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// getPostgres creates a PostgreSQL client using configuration values and returns it
+// along with a cleanup function to close the connection pool.
 func getPostgres(ctx context.Context, cfg *config.Config) (*postgres.PgSQL, func()) {
 	pgsql, err := postgres.New(postgres.Options{
 		Username:           cfg.Database.Username,
@@ -38,6 +42,8 @@ func getPostgres(ctx context.Context, cfg *config.Config) (*postgres.PgSQL, func
 	}
 }
 
+// main sets up the root Cobra command, loads configuration and logging, and
+// registers subcommands before executing the CLI.
 func main() {
 	rootCmd := &cobra.Command{
 		Use: "scanner",
@@ -73,6 +79,7 @@ func main() {
 	rootCmd.AddCommand(
 		migrateCommand(cfg),
 		scanCommand(cfg),
+		JWTCommand(cfg),
 	)
 
 	err = rootCmd.Execute()

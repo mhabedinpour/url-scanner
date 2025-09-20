@@ -90,5 +90,5 @@ func Error(ctx context.Context, msg string, fields ...zapcore.Field) {
 
 // Fatal logs a message at fatal level with the given fields.
 func Fatal(ctx context.Context, msg string, fields ...zapcore.Field) {
-	Get(ctx).Error(msg, fields...)
+	Get(ctx).Fatal(msg, fields...)
 }

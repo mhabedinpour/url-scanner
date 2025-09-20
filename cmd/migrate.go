@@ -12,6 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// migrateCommand constructs the 'migrate' subcommand that applies database
+// migrations to the latest version using goose.
 func migrateCommand(cfg *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate",
