@@ -37,6 +37,9 @@ type ScanStorage interface {
 	// UpdatePendingScansByURL updates all pending scans for the given URL using
 	// the provided field set.
 	UpdatePendingScansByURL(ctx context.Context, URL string, updates ScanUpdates) error
+	// UpdateScanByID updates a single scan identified by its ID and returns the updated row.
+	// The update ignores soft-deleted rows and sets updated_at automatically. Only provided fields are changed.
+	UpdateScanByID(ctx context.Context, ID domain.ScanID, updates ScanUpdates) (*domain.Scan, error)
 	// DeleteScan performs a soft delete for the given scan ID and user ID and
 	// returns the deleted scan, or nil if it was not found.
 	DeleteScan(ctx context.Context, userID domain.UserID, ID domain.ScanID) (*domain.Scan, error)
@@ -51,4 +54,7 @@ type ScanStorage interface {
 	// ScanByID fetches a scan by its ID for the given user, excluding soft-deleted
 	// records. Returns nil when not found.
 	ScanByID(ctx context.Context, userID domain.UserID, ID domain.ScanID) (*domain.Scan, error)
+	// LastCompletedScanByURL returns the most recent completed scan for a given URL across all users.
+	// Returns nil when no completed scan exists for the URL.
+	LastCompletedScanByURL(ctx context.Context, URL string) (*domain.Scan, error)
 }

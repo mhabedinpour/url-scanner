@@ -21,29 +21,31 @@ import (
 // Any failure to create the River client or to insert the job is returned as an
 // error. The provided context controls cancellation and deadlines of the insert
 // operation.
-func (p *PgSQL) AddJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) error {
+func (p *PgSQL) AddJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (bool, error) {
 	tx, ok := p.DB.(*sql.Tx)
 	if ok {
 		riverClient, err := river.NewClient[*sql.Tx](riverdatabasesql.New(nil), &river.Config{})
 		if err != nil {
-			return fmt.Errorf("could not create river queue client: %w", err)
+			return false, fmt.Errorf("could not create river queue client: %w", err)
 		}
 
-		if _, err := riverClient.InsertTx(ctx, tx, args, opts); err != nil {
-			return fmt.Errorf("could not insert job: %w", err)
+		job, err := riverClient.InsertTx(ctx, tx, args, opts)
+		if err != nil {
+			return false, fmt.Errorf("could not insert job: %w", err)
 		}
 
-		return nil
+		return !job.UniqueSkippedAsDuplicate, nil
 	}
 
 	riverClient, err := river.NewClient(riverdatabasesql.New(p.DB.(*sql.DB)), &river.Config{})
 	if err != nil {
-		return fmt.Errorf("could not create river queue client: %w", err)
+		return false, fmt.Errorf("could not create river queue client: %w", err)
 	}
 
-	if _, err := riverClient.Insert(ctx, args, opts); err != nil {
-		return fmt.Errorf("could not insert job: %w", err)
+	job, err := riverClient.Insert(ctx, args, opts)
+	if err != nil {
+		return false, fmt.Errorf("could not insert job: %w", err)
 	}
 
-	return nil
+	return !job.UniqueSkippedAsDuplicate, nil
 }

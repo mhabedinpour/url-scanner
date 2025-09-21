@@ -16,6 +16,7 @@ import (
 	storage "scanner/pkg/storage"
 	time "time"
 
+	river "github.com/riverqueue/river"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -43,6 +44,21 @@ func (m *MockAllStorage) EXPECT() *MockAllStorageMockRecorder {
 	return m.recorder
 }
 
+// AddJob mocks base method.
+func (m *MockAllStorage) AddJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddJob", ctx, args, opts)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddJob indicates an expected call of AddJob.
+func (mr *MockAllStorageMockRecorder) AddJob(ctx, args, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddJob", reflect.TypeOf((*MockAllStorage)(nil).AddJob), ctx, args, opts)
+}
+
 // DeleteScan mocks base method.
 func (m *MockAllStorage) DeleteScan(ctx context.Context, userID domain.UserID, ID domain.ScanID) (*domain.Scan, error) {
 	m.ctrl.T.Helper()
@@ -56,6 +72,21 @@ func (m *MockAllStorage) DeleteScan(ctx context.Context, userID domain.UserID, I
 func (mr *MockAllStorageMockRecorder) DeleteScan(ctx, userID, ID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteScan", reflect.TypeOf((*MockAllStorage)(nil).DeleteScan), ctx, userID, ID)
+}
+
+// LastCompletedScanByURL mocks base method.
+func (m *MockAllStorage) LastCompletedScanByURL(ctx context.Context, URL string) (*domain.Scan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LastCompletedScanByURL", ctx, URL)
+	ret0, _ := ret[0].(*domain.Scan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LastCompletedScanByURL indicates an expected call of LastCompletedScanByURL.
+func (mr *MockAllStorageMockRecorder) LastCompletedScanByURL(ctx, URL any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastCompletedScanByURL", reflect.TypeOf((*MockAllStorage)(nil).LastCompletedScanByURL), ctx, URL)
 }
 
 // ScanByID mocks base method.
@@ -107,6 +138,21 @@ func (mr *MockAllStorageMockRecorder) UpdatePendingScansByURL(ctx, URL, updates 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePendingScansByURL", reflect.TypeOf((*MockAllStorage)(nil).UpdatePendingScansByURL), ctx, URL, updates)
 }
 
+// UpdateScanByID mocks base method.
+func (m *MockAllStorage) UpdateScanByID(ctx context.Context, ID domain.ScanID, updates storage.ScanUpdates) (*domain.Scan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateScanByID", ctx, ID, updates)
+	ret0, _ := ret[0].(*domain.Scan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateScanByID indicates an expected call of UpdateScanByID.
+func (mr *MockAllStorageMockRecorder) UpdateScanByID(ctx, ID, updates any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateScanByID", reflect.TypeOf((*MockAllStorage)(nil).UpdateScanByID), ctx, ID, updates)
+}
+
 // UserScans mocks base method.
 func (m *MockAllStorage) UserScans(ctx context.Context, userID domain.UserID, status domain.ScanStatus, cursor time.Time, limit uint) (storage.UserScans, error) {
 	m.ctrl.T.Helper()
@@ -146,6 +192,21 @@ func (m *MockTxStorage) EXPECT() *MockTxStorageMockRecorder {
 	return m.recorder
 }
 
+// AddJob mocks base method.
+func (m *MockTxStorage) AddJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddJob", ctx, args, opts)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddJob indicates an expected call of AddJob.
+func (mr *MockTxStorageMockRecorder) AddJob(ctx, args, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddJob", reflect.TypeOf((*MockTxStorage)(nil).AddJob), ctx, args, opts)
+}
+
 // Commit mocks base method.
 func (m *MockTxStorage) Commit() error {
 	m.ctrl.T.Helper()
@@ -173,6 +234,21 @@ func (m *MockTxStorage) DeleteScan(ctx context.Context, userID domain.UserID, ID
 func (mr *MockTxStorageMockRecorder) DeleteScan(ctx, userID, ID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteScan", reflect.TypeOf((*MockTxStorage)(nil).DeleteScan), ctx, userID, ID)
+}
+
+// LastCompletedScanByURL mocks base method.
+func (m *MockTxStorage) LastCompletedScanByURL(ctx context.Context, URL string) (*domain.Scan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LastCompletedScanByURL", ctx, URL)
+	ret0, _ := ret[0].(*domain.Scan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LastCompletedScanByURL indicates an expected call of LastCompletedScanByURL.
+func (mr *MockTxStorageMockRecorder) LastCompletedScanByURL(ctx, URL any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastCompletedScanByURL", reflect.TypeOf((*MockTxStorage)(nil).LastCompletedScanByURL), ctx, URL)
 }
 
 // Rollback mocks base method.
@@ -238,6 +314,21 @@ func (mr *MockTxStorageMockRecorder) UpdatePendingScansByURL(ctx, URL, updates a
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePendingScansByURL", reflect.TypeOf((*MockTxStorage)(nil).UpdatePendingScansByURL), ctx, URL, updates)
 }
 
+// UpdateScanByID mocks base method.
+func (m *MockTxStorage) UpdateScanByID(ctx context.Context, ID domain.ScanID, updates storage.ScanUpdates) (*domain.Scan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateScanByID", ctx, ID, updates)
+	ret0, _ := ret[0].(*domain.Scan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateScanByID indicates an expected call of UpdateScanByID.
+func (mr *MockTxStorageMockRecorder) UpdateScanByID(ctx, ID, updates any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateScanByID", reflect.TypeOf((*MockTxStorage)(nil).UpdateScanByID), ctx, ID, updates)
+}
+
 // UserScans mocks base method.
 func (m *MockTxStorage) UserScans(ctx context.Context, userID domain.UserID, status domain.ScanStatus, cursor time.Time, limit uint) (storage.UserScans, error) {
 	m.ctrl.T.Helper()
@@ -275,6 +366,21 @@ func NewMockStorage(ctrl *gomock.Controller) *MockStorage {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockStorage) EXPECT() *MockStorageMockRecorder {
 	return m.recorder
+}
+
+// AddJob mocks base method.
+func (m *MockStorage) AddJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddJob", ctx, args, opts)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddJob indicates an expected call of AddJob.
+func (mr *MockStorageMockRecorder) AddJob(ctx, args, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddJob", reflect.TypeOf((*MockStorage)(nil).AddJob), ctx, args, opts)
 }
 
 // Begin mocks base method.
@@ -319,6 +425,21 @@ func (m *MockStorage) DeleteScan(ctx context.Context, userID domain.UserID, ID d
 func (mr *MockStorageMockRecorder) DeleteScan(ctx, userID, ID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteScan", reflect.TypeOf((*MockStorage)(nil).DeleteScan), ctx, userID, ID)
+}
+
+// LastCompletedScanByURL mocks base method.
+func (m *MockStorage) LastCompletedScanByURL(ctx context.Context, URL string) (*domain.Scan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LastCompletedScanByURL", ctx, URL)
+	ret0, _ := ret[0].(*domain.Scan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LastCompletedScanByURL indicates an expected call of LastCompletedScanByURL.
+func (mr *MockStorageMockRecorder) LastCompletedScanByURL(ctx, URL any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastCompletedScanByURL", reflect.TypeOf((*MockStorage)(nil).LastCompletedScanByURL), ctx, URL)
 }
 
 // ScanByID mocks base method.
@@ -368,6 +489,21 @@ func (m *MockStorage) UpdatePendingScansByURL(ctx context.Context, URL string, u
 func (mr *MockStorageMockRecorder) UpdatePendingScansByURL(ctx, URL, updates any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePendingScansByURL", reflect.TypeOf((*MockStorage)(nil).UpdatePendingScansByURL), ctx, URL, updates)
+}
+
+// UpdateScanByID mocks base method.
+func (m *MockStorage) UpdateScanByID(ctx context.Context, ID domain.ScanID, updates storage.ScanUpdates) (*domain.Scan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateScanByID", ctx, ID, updates)
+	ret0, _ := ret[0].(*domain.Scan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateScanByID indicates an expected call of UpdateScanByID.
+func (mr *MockStorageMockRecorder) UpdateScanByID(ctx, ID, updates any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateScanByID", reflect.TypeOf((*MockStorage)(nil).UpdateScanByID), ctx, ID, updates)
 }
 
 // UserScans mocks base method.

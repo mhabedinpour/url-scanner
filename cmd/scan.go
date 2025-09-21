@@ -61,7 +61,7 @@ func scanCommand(cfg *config.Config) *cobra.Command {
 
 			stopWebserver := setupServer(ctx, cfg, api.Deps{
 				Deps: v1handler.Deps{
-					Scanner: scanner.New(strg),
+					Scanner: scanner.New(strg, scanner.NewOptions(cfg)),
 				},
 				WorkerClient: workerClient,
 			})

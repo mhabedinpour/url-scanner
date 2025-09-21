@@ -26,5 +26,5 @@ import (
 type JobStorage interface {
 	// AddJob enqueues a new job with the given arguments. It should be atomic
 	// with respect to any surrounding transaction when supported by the backend.
-	AddJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) error
+	AddJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (bool, error)
 }

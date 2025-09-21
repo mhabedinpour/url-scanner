@@ -98,7 +98,7 @@ func TestPgSQL_UpdatePendingScansByURL(t *testing.T) {
 	require.NoError(t, pgSQL.UpdatePendingScansByURL(ctx, urlA, u))
 
 	// fetch all user scans and validate
-	page, err := pgSQL.UserScans(ctx, userID, domain.ScanStatus(""), time.Time{}, 50)
+	page, err := pgSQL.UserScans(ctx, userID, "", time.Time{}, 50)
 	require.NoError(t, err)
 
 	// build index by id
@@ -147,7 +147,7 @@ func TestPgSQL_DeleteScan(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, got)
 	// listing should not include it
-	page, err := pgSQL.UserScans(ctx, userID, domain.ScanStatus(""), time.Time{}, 10)
+	page, err := pgSQL.UserScans(ctx, userID, "", time.Time{}, 10)
 	require.NoError(t, err)
 	for _, sc := range page.Scans {
 		require.NotEqual(t, id, sc.ID)
@@ -185,21 +185,21 @@ func TestPgSQL_UserScans_Pagination(t *testing.T) {
 	}
 
 	// first page, limit 2
-	p1, err := pgSQL.UserScans(ctx, userID, domain.ScanStatus(""), time.Time{}, 2)
+	p1, err := pgSQL.UserScans(ctx, userID, "", time.Time{}, 2)
 	require.NoError(t, err)
 	require.Len(t, p1.Scans, 2)
 	require.NotNil(t, p1.NextCursor)
 	c1 := *p1.NextCursor
 
 	// second page
-	p2, err := pgSQL.UserScans(ctx, userID, domain.ScanStatus(""), c1, 2)
+	p2, err := pgSQL.UserScans(ctx, userID, "", c1, 2)
 	require.NoError(t, err)
 	require.Len(t, p2.Scans, 2)
 	require.NotNil(t, p2.NextCursor)
 	c2 := *p2.NextCursor
 
 	// third (last) page, should have 1 left and no next cursor
-	p3, err := pgSQL.UserScans(ctx, userID, domain.ScanStatus(""), c2, 2)
+	p3, err := pgSQL.UserScans(ctx, userID, "", c2, 2)
 	require.NoError(t, err)
 	require.Len(t, p3.Scans, 1)
 	require.Nil(t, p3.NextCursor)
@@ -245,4 +245,126 @@ func TestPgSQL_ScanByID(t *testing.T) {
 	got3, err := pgSQL.ScanByID(ctx, userA, idA)
 	require.NoError(t, err)
 	require.Nil(t, got3)
+}
+
+func TestPgSQL_UpdateScanByID(t *testing.T) {
+	t.Parallel()
+
+	pgSQL, cleanup := setupTestDB(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	user := domain.UserID(uuid.New())
+	stored, err := pgSQL.StoreScans(ctx, domain.Scan{
+		UserID: user,
+		URL:    "https://upd.example",
+		Status: domain.ScanStatusPending,
+	})
+	require.NoError(t, err)
+	require.Len(t, stored, 1)
+	id := stored[0].ID
+
+	empty := ""
+	res := &domain.ScanResult{Page: &struct {
+		URL      string `json:"url,omitempty"`
+		Domain   string `json:"domain,omitempty"`
+		IP       string `json:"ip,omitempty"`
+		ASN      string `json:"asn,omitempty"`
+		Country  string `json:"country,omitempty"`
+		Server   string `json:"server,omitempty"`
+		Status   int    `json:"status,omitempty"`
+		MimeType string `json:"mimeType,omitempty"`
+	}{URL: "https://upd.example"}}
+
+	updated, err := pgSQL.UpdateScanByID(ctx, id, struct {
+		Status    domain.ScanStatus
+		Result    *domain.ScanResult
+		LastError *string
+	}{
+		Status:    domain.ScanStatusCompleted,
+		Result:    res,
+		LastError: &empty, // clear if any
+	})
+	require.NoError(t, err)
+	require.Equal(t, id, updated.ID)
+	require.Equal(t, domain.ScanStatusCompleted, updated.Status)
+	require.False(t, updated.UpdatedAt.IsZero())
+	require.Equal(t, "https://upd.example", updated.Result.Page.URL)
+}
+
+func TestPgSQL_UpdateScanByID_NotFound(t *testing.T) {
+	t.Parallel()
+
+	pgSQL, cleanup := setupTestDB(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	// unknown id
+	unknown := domain.ScanID(uuid.New())
+	updated, err := pgSQL.UpdateScanByID(ctx, unknown, struct {
+		Status    domain.ScanStatus
+		Result    *domain.ScanResult
+		LastError *string
+	}{Status: domain.ScanStatusFailed})
+	require.NoError(t, err)
+	require.Nil(t, updated)
+
+	// deleted id
+	user := domain.UserID(uuid.New())
+	ins, err := pgSQL.StoreScans(ctx, domain.Scan{
+		UserID: user,
+		URL:    "https://del.example",
+		Status: domain.ScanStatusPending,
+	})
+	require.NoError(t, err)
+	_, err = pgSQL.DeleteScan(ctx, user, ins[0].ID)
+	require.NoError(t, err)
+	updated2, err := pgSQL.UpdateScanByID(ctx, ins[0].ID, struct {
+		Status    domain.ScanStatus
+		Result    *domain.ScanResult
+		LastError *string
+	}{Status: domain.ScanStatusCompleted})
+	require.NoError(t, err)
+	require.Nil(t, updated2)
+}
+
+func TestPgSQL_LastCompletedScanByURL(t *testing.T) {
+	t.Parallel()
+
+	pgSQL, cleanup := setupTestDB(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	url := "https://latest.example"
+	userA := domain.UserID(uuid.New())
+	userB := domain.UserID(uuid.New())
+
+	// Insert various scans for the same URL across users
+	stored, err := pgSQL.StoreScans(ctx,
+		domain.Scan{UserID: userA, URL: url, Status: domain.ScanStatusCompleted},             // older
+		domain.Scan{UserID: userB, URL: url, Status: domain.ScanStatusCompleted},             // newer
+		domain.Scan{UserID: userA, URL: url, Status: domain.ScanStatusPending},               // ignore
+		domain.Scan{UserID: userB, URL: "https://other", Status: domain.ScanStatusCompleted}, // different URL
+	)
+	require.NoError(t, err)
+	require.Len(t, stored, 4)
+
+	// Set deterministic created_at: make second completed the newest
+	now := time.Now().UTC()
+	// order in stored equals inputs; set index 0 older, index 1 newer
+	_, err = pgSQL.DB.ExecContext(ctx,
+		"UPDATE scans SET created_at = $1 WHERE id = $2",
+		now.Add(-2*time.Minute),
+		uuid.UUID(stored[0].ID))
+	require.NoError(t, err)
+	_, err = pgSQL.DB.ExecContext(ctx,
+		"UPDATE scans SET created_at = $1 WHERE id = $2",
+		now.Add(-1*time.Minute),
+		uuid.UUID(stored[1].ID))
+	require.NoError(t, err)
+
+	got, err := pgSQL.LastCompletedScanByURL(ctx, url)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Equal(t, stored[1].ID, got.ID)
 }

@@ -41,7 +41,7 @@ func TestPgSQL_AddJob_WithinTransaction_UsesTxPath(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = txStorage.Rollback() }()
 
-	err = txStorage.AddJob(ctx, dummyJobArgs{}, &river.InsertOpts{})
+	_, err = txStorage.AddJob(ctx, dummyJobArgs{}, &river.InsertOpts{})
 	require.NoError(t, err)
 	rivertest.RequireInsertedTx[*riverdatabasesql.Driver](
 		ctx,
@@ -59,7 +59,7 @@ func TestPgSQL_AddJob_OutsideTransaction_UsesDBPath(t *testing.T) {
 
 	ctx := context.Background()
 
-	err := pg.AddJob(ctx, dummyJobArgs{}, &river.InsertOpts{})
+	_, err := pg.AddJob(ctx, dummyJobArgs{}, &river.InsertOpts{})
 	require.NoError(t, err)
 	rivertest.RequireInserted[*riverdatabasesql.Driver](
 		ctx,

@@ -37,9 +37,7 @@ func (p *PgSQL) StoreScans(ctx context.Context, scans ...domain.Scan) ([]domain.
 	return pgScansToDomain(result)
 }
 
-// UpdatePendingScansByURL updates all pending scans for the given URL with provided fields.
-// Only non-nil fields from updates are set. Attempts is incremented by 1 and updated_at is set.
-func (p *PgSQL) UpdatePendingScansByURL(ctx context.Context, URL string, updates storage.ScanUpdates) error {
+func getScanUpdates(updates storage.ScanUpdates) (goqu.Record, error) {
 	rec := goqu.Record{
 		"updated_at": goqu.L("CURRENT_TIMESTAMP"),
 		"attempts":   goqu.L("attempts + 1"),
@@ -48,7 +46,7 @@ func (p *PgSQL) UpdatePendingScansByURL(ctx context.Context, URL string, updates
 	if updates.Result != nil {
 		b, err := json.Marshal(updates.Result)
 		if err != nil {
-			return fmt.Errorf("could not marshal result: %w", err)
+			return nil, fmt.Errorf("could not marshal result: %w", err)
 		}
 
 		rec["result"] = b
@@ -62,8 +60,19 @@ func (p *PgSQL) UpdatePendingScansByURL(ctx context.Context, URL string, updates
 		}
 	}
 
-	_, err := p.Builder.Update(scansTable).
-		Set(rec).Where(
+	return rec, nil
+}
+
+// UpdatePendingScansByURL updates all pending scans for the given URL with provided fields.
+// Only non-nil fields from updates are set. Attempts is incremented by 1 and updated_at is set.
+func (p *PgSQL) UpdatePendingScansByURL(ctx context.Context, URL string, updates storage.ScanUpdates) error {
+	updateRec, err := getScanUpdates(updates)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.Builder.Update(scansTable).
+		Set(updateRec).Where(
 		goqu.I("url").Eq(URL),
 		goqu.I("status").Eq(string(domain.ScanStatusPending)),
 		goqu.I("deleted_at").IsNull(),
@@ -158,6 +167,56 @@ func (p *PgSQL) ScanByID(ctx context.Context, userID domain.UserID, id domain.Sc
 		Executor().ScanStructContext(ctx, &row)
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch scan by id: %w", err)
+	}
+	if !found {
+		return nil, nil
+	}
+
+	return row.ToDomain()
+}
+
+// UpdateScanByID updates a single scan by its ID and returns the updated record.
+// Only provided fields are updated; updated_at is set automatically. Soft-deleted rows are ignored.
+func (p *PgSQL) UpdateScanByID(
+	ctx context.Context,
+	id domain.ScanID,
+	updates storage.ScanUpdates) (*domain.Scan, error) {
+	updateRec, err := getScanUpdates(updates)
+	if err != nil {
+		return nil, err
+	}
+
+	var row PgScan
+	found, err := p.Builder.Update(scansTable).
+		Set(updateRec).Where(
+		goqu.I("id").Eq(uuid.UUID(id)),
+		goqu.I("deleted_at").IsNull(),
+	).
+		Returning(&PgScan{}).
+		Executor().ScanStructContext(ctx, &row)
+	if err != nil {
+		return nil, fmt.Errorf("could not update scan by id in pg: %w", err)
+	}
+	if !found {
+		return nil, nil
+	}
+
+	return row.ToDomain()
+}
+
+// LastCompletedScanByURL returns the latest completed scan for a URL across all users.
+func (p *PgSQL) LastCompletedScanByURL(ctx context.Context, URL string) (*domain.Scan, error) {
+	var row PgScan
+	found, err := p.Builder.From(scansTable).
+		Where(
+			goqu.I("url").Eq(URL),
+			goqu.I("status").Eq(string(domain.ScanStatusCompleted)),
+		).
+		Order(goqu.I("created_at").Desc(), goqu.I("id").Desc()).
+		Limit(1).
+		Executor().ScanStructContext(ctx, &row)
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch last completed scan from pg: %w", err)
 	}
 	if !found {
 		return nil, nil
