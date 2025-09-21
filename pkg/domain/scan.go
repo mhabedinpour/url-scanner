@@ -27,23 +27,21 @@ const (
 // page metadata, a verdict, and aggregated stats.
 type ScanResult struct {
 	Page *struct {
-		URL      string `json:"url,omitempty"`
-		Domain   string `json:"domain,omitempty"`
-		IP       string `json:"ip,omitempty"`
-		ASN      string `json:"asn,omitempty"`
-		Country  string `json:"country,omitempty"`
-		Server   string `json:"server,omitempty"`
-		Status   int    `json:"status,omitempty"`
-		MimeType string `json:"mimeType,omitempty"`
+		URL     string `json:"url"`
+		Domain  string `json:"domain"`
+		IP      string `json:"ip"`
+		ASN     string `json:"asn"`
+		Country string `json:"country"`
+		Server  string `json:"server"`
 	} `json:"page,omitempty"`
 
 	Verdict *struct {
-		Malicious bool `json:"malicious,omitempty"`
-		Score     int  `json:"score,omitempty"`
+		Malicious bool `json:"malicious"`
+		Score     int  `json:"score"`
 	} `json:"verdicts,omitempty"`
 
 	Stats *struct {
-		Malicious int `json:"malicious,omitempty"`
+		Malicious int `json:"malicious"`
 	} `json:"stats,omitempty"`
 }
 

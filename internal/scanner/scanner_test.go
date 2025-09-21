@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"scanner/internal/scanner"
+	mockurlscanner "scanner/pkg/urlscanner/mock"
 	"testing"
 	"time"
 
@@ -27,7 +28,8 @@ func newTestScanner(t *testing.T) (*gomock.Controller, *mockstorage.MockStorage,
 
 	ctrl := gomock.NewController(t)
 	st := mockstorage.NewMockStorage(ctrl)
-	s := scanner.New(st, scanner.Options{MaxAttempts: 3, ResultCacheTTL: time.Hour})
+	urlScanner := mockurlscanner.NewMockClient(ctrl)
+	s := scanner.New(st, urlScanner, scanner.Options{MaxAttempts: 3, ResultCacheTTL: time.Hour})
 
 	return ctrl, st, s
 }

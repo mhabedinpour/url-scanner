@@ -41,7 +41,17 @@ func getScanUpdates(updates storage.ScanUpdates) (goqu.Record, error) {
 	rec := goqu.Record{
 		"updated_at": goqu.L("CURRENT_TIMESTAMP"),
 		"attempts":   goqu.L("attempts + 1"),
-		"status":     updates.Status,
+	}
+	// Status handling:
+	// - For Completed (or any non-Failed status), set directly.
+	// - For Failed, only set to Failed if attempts after increment exceed MaxAttempts when provided (> 0).
+	if updates.Status != "" {
+		if updates.Status == domain.ScanStatusFailed && updates.MaxAttempts > 0 {
+			rec["status"] =
+				goqu.L("CASE WHEN attempts + 1 >= ? THEN ? ELSE status END", updates.MaxAttempts, string(domain.ScanStatusFailed))
+		} else {
+			rec["status"] = updates.Status
+		}
 	}
 	if updates.Result != nil {
 		b, err := json.Marshal(updates.Result)
@@ -65,6 +75,9 @@ func getScanUpdates(updates storage.ScanUpdates) (goqu.Record, error) {
 
 // UpdatePendingScansByURL updates all pending scans for the given URL with provided fields.
 // Only non-nil fields from updates are set. Attempts is incremented by 1 and updated_at is set.
+// Special handling: when updates.Status is Failed and updates.MaxAttempts > 0,
+// status is only set to Failed if attempts after increment would exceed MaxAttempts;
+// otherwise status remains unchanged (i.e., stays Pending).
 func (p *PgSQL) UpdatePendingScansByURL(ctx context.Context, URL string, updates storage.ScanUpdates) error {
 	updateRec, err := getScanUpdates(updates)
 	if err != nil {
@@ -223,4 +236,20 @@ func (p *PgSQL) LastCompletedScanByURL(ctx context.Context, URL string) (*domain
 	}
 
 	return row.ToDomain()
+}
+
+// PendingScanCountByURL returns the number of pending, non-deleted scans for the URL across all users.
+func (p *PgSQL) PendingScanCountByURL(ctx context.Context, URL string) (int64, error) {
+	count, err := p.Builder.From(scansTable).
+		Where(
+			goqu.I("url").Eq(URL),
+			goqu.I("status").Eq(string(domain.ScanStatusPending)),
+			goqu.I("deleted_at").IsNull(),
+		).
+		CountContext(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("could not count pending scans by url in pg: %w", err)
+	}
+
+	return count, nil
 }

@@ -1272,29 +1272,15 @@ func (s *ScanResultPage) encodeFields(e *jx.Encoder) {
 			s.Server.Encode(e)
 		}
 	}
-	{
-		if s.Status.Set {
-			e.FieldStart("status")
-			s.Status.Encode(e)
-		}
-	}
-	{
-		if s.MimeType.Set {
-			e.FieldStart("mimeType")
-			s.MimeType.Encode(e)
-		}
-	}
 }
 
-var jsonFieldsNameOfScanResultPage = [8]string{
+var jsonFieldsNameOfScanResultPage = [6]string{
 	0: "url",
 	1: "domain",
 	2: "ip",
 	3: "asn",
 	4: "country",
 	5: "server",
-	6: "status",
-	7: "mimeType",
 }
 
 // Decode decodes ScanResultPage from json.
@@ -1364,26 +1350,6 @@ func (s *ScanResultPage) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"server\"")
-			}
-		case "status":
-			if err := func() error {
-				s.Status.Reset()
-				if err := s.Status.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"status\"")
-			}
-		case "mimeType":
-			if err := func() error {
-				s.MimeType.Reset()
-				if err := s.MimeType.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"mimeType\"")
 			}
 		default:
 			return d.Skip()

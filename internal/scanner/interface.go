@@ -33,4 +33,7 @@ type Scanner interface {
 	// Delete removes a scan belonging to the given user. If the scan does not
 	// exist, a not-found error is returned.
 	Delete(ctx context.Context, userID domain.UserID, scanID domain.ScanID) error
+
+	// Scan scans the given URL, waits for results and store results in the database.
+	Scan(ctx context.Context, URL string) error
 }

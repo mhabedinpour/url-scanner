@@ -16,6 +16,10 @@ type ScanUpdates struct {
 	// LastError, when provided, sets the last error text. An empty string value
 	// indicates the error should be cleared (set to NULL).
 	LastError *string
+	// MaxAttempts, when provided alongside a Failed status, ensures that status
+	// is only updated to Failed if the current attempts after increment would
+	// exceed this threshold. A value <= 0 disables this guard.
+	MaxAttempts int
 }
 
 // UserScans groups a page of scans returned for a user together with an
@@ -36,7 +40,15 @@ type ScanStorage interface {
 	StoreScans(ctx context.Context, scans ...domain.Scan) ([]domain.Scan, error)
 	// UpdatePendingScansByURL updates all pending scans for the given URL using
 	// the provided field set.
+	// Notes:
+	// - Attempts is incremented by 1 and updated_at is set automatically.
+	// - If Status is Failed and MaxAttempts > 0, status is only set to Failed
+	//   when the attempts after increment would exceed MaxAttempts; otherwise
+	//   status remains unchanged (i.e., stays Pending).
 	UpdatePendingScansByURL(ctx context.Context, URL string, updates ScanUpdates) error
+	// PendingScanCountByURL returns the total number of pending scans for the given URL
+	// across all users. Soft-deleted records are excluded from the count.
+	PendingScanCountByURL(ctx context.Context, URL string) (int64, error)
 	// UpdateScanByID updates a single scan identified by its ID and returns the updated row.
 	// The update ignores soft-deleted rows and sets updated_at automatically. Only provided fields are changed.
 	UpdateScanByID(ctx context.Context, ID domain.ScanID, updates ScanUpdates) (*domain.Scan, error)

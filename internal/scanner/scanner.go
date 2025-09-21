@@ -5,9 +5,20 @@ import (
 	"fmt"
 	"scanner/internal/config"
 	"scanner/pkg/domain"
+	"scanner/pkg/logger"
 	"scanner/pkg/serrors"
 	"scanner/pkg/storage"
+	"scanner/pkg/urlscanner"
 	"time"
+
+	"go.uber.org/zap"
+)
+
+const (
+	scanResultPollTimeout      = 30 * time.Second
+	scanResultPollInitialDelay = time.Second
+	scanResultPollIntervalBase = 2 * time.Second
+	scanResultPollIntervalMax  = 10 * time.Minute
 )
 
 // Options configure how scan jobs are enqueued and how results are cached.
@@ -37,6 +48,8 @@ type scanner struct {
 	options Options
 	// storage is the persistence layer used to store scans and manage jobs.
 	storage storage.Storage
+	// urlScanner is the client used to submit scan requests to urlscan.io.
+	urlScanner urlscanner.Client
 }
 
 // Enqueue stores a new scan request for the given URL and user, and attempts
@@ -163,11 +176,90 @@ func (s scanner) Delete(ctx context.Context, userID domain.UserID, scanID domain
 	return nil
 }
 
+// TODO: tests and docs
+
+func (s scanner) Scan(ctx context.Context, URL string) error {
+	// makes sure there are still pending scans for the URL before processing,
+	// this is required because during scan deletion we do not cancel jobs
+	pendingCount, err := s.storage.PendingScanCountByURL(ctx, URL)
+	if err != nil {
+		return fmt.Errorf("could not get pending scan count: %w", err)
+	}
+	if pendingCount <= 0 {
+		logger.Warn(ctx, "no pending scans for URL, skipping")
+
+		return serrors.With(serrors.ErrConflict, "no pending scans for URL")
+	}
+
+	res, err := s.submitURLAndPoll(ctx, URL)
+	if err != nil {
+		lastErr := err.Error()
+		if err := s.storage.UpdatePendingScansByURL(ctx, URL, storage.ScanUpdates{
+			Status:      domain.ScanStatusFailed,
+			LastError:   &lastErr,
+			MaxAttempts: s.options.MaxAttempts,
+		}); err != nil {
+			// just log the error and continue
+			logger.Error(ctx, "error updating scan", zap.Error(err))
+		}
+
+		return err
+	}
+
+	if err := s.storage.UpdatePendingScansByURL(ctx, URL, storage.ScanUpdates{
+		Status: domain.ScanStatusCompleted,
+		Result: res,
+	}); err != nil {
+		return fmt.Errorf("could not update scan: %w", err)
+	}
+
+	// TODO: rate limit errors
+
+	return nil
+}
+
+func (s scanner) submitURLAndPoll(ctx context.Context, URL string) (*domain.ScanResult, error) {
+	logger.Info(ctx, "submitting URL to urlscanner")
+	scanRes, _, err := s.urlScanner.SubmitURL(ctx, URL)
+	if err != nil {
+		return nil, fmt.Errorf("could not submit URL: %w", err)
+	}
+
+	// initial delay
+	time.Sleep(scanResultPollInitialDelay)
+	// poll for results until timeout
+	ctx, cancel := context.WithTimeout(ctx, scanResultPollTimeout)
+	defer cancel()
+	// start delay with the base interval
+	delay := scanResultPollIntervalBase
+
+	for {
+		logger.Debug(ctx, "reading results from urlscanner")
+		result, err := s.urlScanner.Result(ctx, scanRes.ID)
+		if err == nil {
+			logger.Debug(ctx, "received results from urlscanner")
+
+			return result, nil
+		}
+
+		logger.Debug(ctx, "error reading results from urlscanner, will retry...", zap.Error(err))
+
+		select {
+		case <-time.After(delay):
+			// double delay each time with a cap
+			delay = min(delay*2, scanResultPollIntervalMax)
+		case <-ctx.Done():
+			return nil, fmt.Errorf("timeout waiting for results: %w", ctx.Err())
+		}
+	}
+}
+
 // New creates a new Scanner instance backed by the provided storage and
 // configured with the given options.
-func New(storage storage.Storage, options Options) Scanner {
+func New(storage storage.Storage, URLScanner urlscanner.Client, options Options) Scanner {
 	return &scanner{
-		options: options,
-		storage: storage,
+		options:    options,
+		storage:    storage,
+		urlScanner: URLScanner,
 	}
 }

@@ -89,6 +89,21 @@ func (mr *MockAllStorageMockRecorder) LastCompletedScanByURL(ctx, URL any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastCompletedScanByURL", reflect.TypeOf((*MockAllStorage)(nil).LastCompletedScanByURL), ctx, URL)
 }
 
+// PendingScanCountByURL mocks base method.
+func (m *MockAllStorage) PendingScanCountByURL(ctx context.Context, URL string) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PendingScanCountByURL", ctx, URL)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PendingScanCountByURL indicates an expected call of PendingScanCountByURL.
+func (mr *MockAllStorageMockRecorder) PendingScanCountByURL(ctx, URL any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingScanCountByURL", reflect.TypeOf((*MockAllStorage)(nil).PendingScanCountByURL), ctx, URL)
+}
+
 // ScanByID mocks base method.
 func (m *MockAllStorage) ScanByID(ctx context.Context, userID domain.UserID, ID domain.ScanID) (*domain.Scan, error) {
 	m.ctrl.T.Helper()
@@ -249,6 +264,21 @@ func (m *MockTxStorage) LastCompletedScanByURL(ctx context.Context, URL string) 
 func (mr *MockTxStorageMockRecorder) LastCompletedScanByURL(ctx, URL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastCompletedScanByURL", reflect.TypeOf((*MockTxStorage)(nil).LastCompletedScanByURL), ctx, URL)
+}
+
+// PendingScanCountByURL mocks base method.
+func (m *MockTxStorage) PendingScanCountByURL(ctx context.Context, URL string) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PendingScanCountByURL", ctx, URL)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PendingScanCountByURL indicates an expected call of PendingScanCountByURL.
+func (mr *MockTxStorageMockRecorder) PendingScanCountByURL(ctx, URL any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingScanCountByURL", reflect.TypeOf((*MockTxStorage)(nil).PendingScanCountByURL), ctx, URL)
 }
 
 // Rollback mocks base method.
@@ -440,6 +470,21 @@ func (m *MockStorage) LastCompletedScanByURL(ctx context.Context, URL string) (*
 func (mr *MockStorageMockRecorder) LastCompletedScanByURL(ctx, URL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastCompletedScanByURL", reflect.TypeOf((*MockStorage)(nil).LastCompletedScanByURL), ctx, URL)
+}
+
+// PendingScanCountByURL mocks base method.
+func (m *MockStorage) PendingScanCountByURL(ctx context.Context, URL string) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PendingScanCountByURL", ctx, URL)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PendingScanCountByURL indicates an expected call of PendingScanCountByURL.
+func (mr *MockStorageMockRecorder) PendingScanCountByURL(ctx, URL any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingScanCountByURL", reflect.TypeOf((*MockStorage)(nil).PendingScanCountByURL), ctx, URL)
 }
 
 // ScanByID mocks base method.

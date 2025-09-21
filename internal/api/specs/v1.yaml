@@ -165,8 +165,6 @@ components:
             asn:      { type: string }
             country:  { type: string }
             server:   { type: string }
-            status:   { type: integer }
-            mimeType: { type: string }
         verdicts:
           type: object
           properties:

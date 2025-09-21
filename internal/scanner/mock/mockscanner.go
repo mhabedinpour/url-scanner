@@ -85,6 +85,20 @@ func (mr *MockScannerMockRecorder) Result(ctx, userID, scanID any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Result", reflect.TypeOf((*MockScanner)(nil).Result), ctx, userID, scanID)
 }
 
+// Scan mocks base method.
+func (m *MockScanner) Scan(ctx context.Context, URL string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Scan", ctx, URL)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Scan indicates an expected call of Scan.
+func (mr *MockScannerMockRecorder) Scan(ctx, URL any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Scan", reflect.TypeOf((*MockScanner)(nil).Scan), ctx, URL)
+}
+
 // UserScans mocks base method.
 func (m *MockScanner) UserScans(ctx context.Context, userID domain.UserID, status domain.ScanStatus, cursor string, limit uint) ([]domain.Scan, string, error) {
 	m.ctrl.T.Helper()

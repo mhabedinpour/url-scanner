@@ -670,14 +670,12 @@ func (s *ScanResult) SetStats(val ScanResultStats) {
 }
 
 type ScanResultPage struct {
-	URL      OptURI    `json:"url"`
-	Domain   OptString `json:"domain"`
-	IP       OptString `json:"ip"`
-	Asn      OptString `json:"asn"`
-	Country  OptString `json:"country"`
-	Server   OptString `json:"server"`
-	Status   OptInt    `json:"status"`
-	MimeType OptString `json:"mimeType"`
+	URL     OptURI    `json:"url"`
+	Domain  OptString `json:"domain"`
+	IP      OptString `json:"ip"`
+	Asn     OptString `json:"asn"`
+	Country OptString `json:"country"`
+	Server  OptString `json:"server"`
 }
 
 // GetURL returns the value of URL.
@@ -710,16 +708,6 @@ func (s *ScanResultPage) GetServer() OptString {
 	return s.Server
 }
 
-// GetStatus returns the value of Status.
-func (s *ScanResultPage) GetStatus() OptInt {
-	return s.Status
-}
-
-// GetMimeType returns the value of MimeType.
-func (s *ScanResultPage) GetMimeType() OptString {
-	return s.MimeType
-}
-
 // SetURL sets the value of URL.
 func (s *ScanResultPage) SetURL(val OptURI) {
 	s.URL = val
@@ -748,16 +736,6 @@ func (s *ScanResultPage) SetCountry(val OptString) {
 // SetServer sets the value of Server.
 func (s *ScanResultPage) SetServer(val OptString) {
 	s.Server = val
-}
-
-// SetStatus sets the value of Status.
-func (s *ScanResultPage) SetStatus(val OptInt) {
-	s.Status = val
-}
-
-// SetMimeType sets the value of MimeType.
-func (s *ScanResultPage) SetMimeType(val OptString) {
-	s.MimeType = val
 }
 
 type ScanResultStats struct {

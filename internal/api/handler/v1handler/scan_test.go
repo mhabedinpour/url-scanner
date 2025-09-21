@@ -19,33 +19,29 @@ import (
 func Test_toV1Result_Mapping(t *testing.T) {
 	in := &domain.ScanResult{
 		Page: &struct {
-			URL      string `json:"url,omitempty"`
-			Domain   string `json:"domain,omitempty"`
-			IP       string `json:"ip,omitempty"`
-			ASN      string `json:"asn,omitempty"`
-			Country  string `json:"country,omitempty"`
-			Server   string `json:"server,omitempty"`
-			Status   int    `json:"status,omitempty"`
-			MimeType string `json:"mimeType,omitempty"`
+			URL     string `json:"url"`
+			Domain  string `json:"domain"`
+			IP      string `json:"ip"`
+			ASN     string `json:"asn"`
+			Country string `json:"country"`
+			Server  string `json:"server"`
 		}{
-			URL:      "https://example.com/index.html",
-			Domain:   "example.com",
-			IP:       "93.184.216.34",
-			ASN:      "AS15133",
-			Country:  "US",
-			Server:   "nginx",
-			Status:   200,
-			MimeType: "text/html",
+			URL:     "https://example.com/index.html",
+			Domain:  "example.com",
+			IP:      "93.184.216.34",
+			ASN:     "AS15133",
+			Country: "US",
+			Server:  "nginx",
 		},
 		Verdict: &struct {
-			Malicious bool `json:"malicious,omitempty"`
-			Score     int  `json:"score,omitempty"`
+			Malicious bool `json:"malicious"`
+			Score     int  `json:"score"`
 		}{
 			Malicious: true,
 			Score:     42,
 		},
 		Stats: &struct {
-			Malicious int `json:"malicious,omitempty"`
+			Malicious int `json:"malicious"`
 		}{
 			Malicious: 3,
 		},
@@ -60,8 +56,6 @@ func Test_toV1Result_Mapping(t *testing.T) {
 	require.Equal(t, "AS15133", out.Page.Asn.Value)
 	require.Equal(t, "US", out.Page.Country.Value)
 	require.Equal(t, "nginx", out.Page.Server.Value)
-	require.Equal(t, 200, out.Page.Status.Value)
-	require.Equal(t, "text/html", out.Page.MimeType.Value)
 
 	require.True(t, out.Verdicts.Malicious.Value, "malicious expected true")
 	require.Equal(t, 42, out.Verdicts.Score.Value)

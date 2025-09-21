@@ -58,14 +58,16 @@ type Config struct {
 		ConnMaxIdleTime time.Duration `env:"DATABASE_CONNECTION_MAX_IDLE_TIME" env-default:"3m" yaml:"connMaxIdleTime"`
 	} `yaml:"database"`
 
+	// TODO: docs
 	JWT struct {
 		PublicKey  string `env:"JWT_PUBLIC_KEY"  yaml:"publicKey"`
 		PrivateKey string `env:"JWT_PRIVATE_KEY" yaml:"privateKey"`
 	} `yaml:"jwt"`
 
 	Scanner struct {
-		MaxAttempts    int           `env:"SCANNER_MAX_ATTEMPTS"     env-default:"5"  yaml:"maxAttempts"`
-		ResultCacheTTL time.Duration `env:"SCANNER_RESULT_CACHE_TTL" env-default:"1h" yaml:"resultCacheTtl"`
+		MaxAttempts     int           `env:"SCANNER_MAX_ATTEMPTS"       env-default:"5"        yaml:"maxAttempts"`
+		ResultCacheTTL  time.Duration `env:"SCANNER_RESULT_CACHE_TTL"   env-default:"1h"       yaml:"resultCacheTtl"`
+		UrlscanioAPIKey string        `env:"SCANNER_URLSCAN_IO_API_KEY" yaml:"urlscanioApiKey"`
 	} `yaml:"scanner"`
 
 	// GracefulShutdownTimeout is the maximum duration to wait for ongoing requests to complete during shutdown

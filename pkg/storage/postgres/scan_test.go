@@ -3,11 +3,17 @@ package postgres_test
 import (
 	"context"
 	"scanner/pkg/domain"
+	"scanner/pkg/storage"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	urlA = "https://example.com/a"
+	urlB = "https://example.com/b"
 )
 
 func TestPgSQL_StoreScans(t *testing.T) {
@@ -72,8 +78,6 @@ func TestPgSQL_UpdatePendingScansByURL(t *testing.T) {
 	ctx := context.Background()
 
 	userID := domain.UserID(uuid.New())
-	urlA := "https://example.com/a"
-	urlB := "https://example.com/b"
 
 	// insert scans
 	s1 := domain.Scan{UserID: userID, URL: urlA, Status: domain.ScanStatusPending}
@@ -86,11 +90,7 @@ func TestPgSQL_UpdatePendingScansByURL(t *testing.T) {
 
 	// update only pending scans for urlA
 	empty := ""
-	u := struct {
-		Status    domain.ScanStatus
-		Result    *domain.ScanResult
-		LastError *string
-	}{
+	u := storage.ScanUpdates{
 		Status:    domain.ScanStatusCompleted,
 		Result:    &domain.ScanResult{},
 		LastError: &empty, // clear last_error to NULL
@@ -121,6 +121,44 @@ func TestPgSQL_UpdatePendingScansByURL(t *testing.T) {
 	// s4 for urlB should remain pending
 	sc4 := byID[uuid.UUID(ins[3].ID)]
 	require.Equal(t, domain.ScanStatusPending, sc4.Status)
+}
+
+func TestPgSQL_UpdatePendingScansByURL_FailedWithMaxAttempts(t *testing.T) {
+	t.Parallel()
+
+	pgSQL, cleanup := setupTestDB(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	userID := domain.UserID(uuid.New())
+
+	// insert a single pending scan
+	ins, err := pgSQL.StoreScans(ctx, domain.Scan{UserID: userID, URL: urlA, Status: domain.ScanStatusPending})
+	require.NoError(t, err)
+	require.Len(t, ins, 1)
+
+	errMsg := "boom"
+	updates := storage.ScanUpdates{
+		Status:      domain.ScanStatusFailed,
+		LastError:   &errMsg,
+		MaxAttempts: 3,
+	}
+
+	// perform 3 updates; first 2 should keep status pending, 3th should fail
+	for i := 1; i <= 3; i++ {
+		require.NoError(t, pgSQL.UpdatePendingScansByURL(ctx, urlA, updates))
+		page, err := pgSQL.UserScans(ctx, userID, "", time.Time{}, 10)
+		require.NoError(t, err)
+		require.Len(t, page.Scans, 1)
+		sc := page.Scans[0]
+		require.EqualValues(t, i, sc.Attempts)
+		if i <= 2 {
+			require.Equal(t, domain.ScanStatusPending, sc.Status)
+			require.Equal(t, errMsg, sc.LastError)
+		} else {
+			require.Equal(t, domain.ScanStatusFailed, sc.Status)
+		}
+	}
 }
 
 func TestPgSQL_DeleteScan(t *testing.T) {
@@ -266,21 +304,15 @@ func TestPgSQL_UpdateScanByID(t *testing.T) {
 
 	empty := ""
 	res := &domain.ScanResult{Page: &struct {
-		URL      string `json:"url,omitempty"`
-		Domain   string `json:"domain,omitempty"`
-		IP       string `json:"ip,omitempty"`
-		ASN      string `json:"asn,omitempty"`
-		Country  string `json:"country,omitempty"`
-		Server   string `json:"server,omitempty"`
-		Status   int    `json:"status,omitempty"`
-		MimeType string `json:"mimeType,omitempty"`
+		URL     string `json:"url"`
+		Domain  string `json:"domain"`
+		IP      string `json:"ip"`
+		ASN     string `json:"asn"`
+		Country string `json:"country"`
+		Server  string `json:"server"`
 	}{URL: "https://upd.example"}}
 
-	updated, err := pgSQL.UpdateScanByID(ctx, id, struct {
-		Status    domain.ScanStatus
-		Result    *domain.ScanResult
-		LastError *string
-	}{
+	updated, err := pgSQL.UpdateScanByID(ctx, id, storage.ScanUpdates{
 		Status:    domain.ScanStatusCompleted,
 		Result:    res,
 		LastError: &empty, // clear if any
@@ -301,11 +333,7 @@ func TestPgSQL_UpdateScanByID_NotFound(t *testing.T) {
 
 	// unknown id
 	unknown := domain.ScanID(uuid.New())
-	updated, err := pgSQL.UpdateScanByID(ctx, unknown, struct {
-		Status    domain.ScanStatus
-		Result    *domain.ScanResult
-		LastError *string
-	}{Status: domain.ScanStatusFailed})
+	updated, err := pgSQL.UpdateScanByID(ctx, unknown, storage.ScanUpdates{Status: domain.ScanStatusFailed})
 	require.NoError(t, err)
 	require.Nil(t, updated)
 
@@ -319,11 +347,7 @@ func TestPgSQL_UpdateScanByID_NotFound(t *testing.T) {
 	require.NoError(t, err)
 	_, err = pgSQL.DeleteScan(ctx, user, ins[0].ID)
 	require.NoError(t, err)
-	updated2, err := pgSQL.UpdateScanByID(ctx, ins[0].ID, struct {
-		Status    domain.ScanStatus
-		Result    *domain.ScanResult
-		LastError *string
-	}{Status: domain.ScanStatusCompleted})
+	updated2, err := pgSQL.UpdateScanByID(ctx, ins[0].ID, storage.ScanUpdates{Status: domain.ScanStatusCompleted})
 	require.NoError(t, err)
 	require.Nil(t, updated2)
 }
@@ -367,4 +391,46 @@ func TestPgSQL_LastCompletedScanByURL(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	require.Equal(t, stored[1].ID, got.ID)
+}
+
+func TestPgSQL_PendingScanCountByURL(t *testing.T) {
+	t.Parallel()
+
+	pgSQL, cleanup := setupTestDB(t)
+	t.Cleanup(cleanup)
+	ctx := context.Background()
+
+	user1 := domain.UserID(uuid.New())
+	user2 := domain.UserID(uuid.New())
+
+	// Create scans
+	ins, err := pgSQL.StoreScans(ctx,
+		domain.Scan{UserID: user1, URL: urlA, Status: domain.ScanStatusPending},   // 0
+		domain.Scan{UserID: user1, URL: urlA, Status: domain.ScanStatusPending},   // 1
+		domain.Scan{UserID: user2, URL: urlA, Status: domain.ScanStatusPending},   // 2
+		domain.Scan{UserID: user1, URL: urlA, Status: domain.ScanStatusCompleted}, // 3 (not counted)
+		domain.Scan{UserID: user1, URL: urlB, Status: domain.ScanStatusPending},   // 4 (different URL)
+	)
+	require.NoError(t, err)
+	require.Len(t, ins, 5)
+
+	// Soft-delete one pending for URL A
+	deleted, err := pgSQL.DeleteScan(ctx, user1, ins[1].ID)
+	require.NoError(t, err)
+	require.NotNil(t, deleted)
+
+	// Count for URL A should be 3 (two pending remaining for user1 and user2)
+	cnt, err := pgSQL.PendingScanCountByURL(ctx, urlA)
+	require.NoError(t, err)
+	require.EqualValues(t, 2+1-1, cnt) // total 2 user1 pending (one deleted) + 1 user2 pending
+
+	// Count for URL B should be 1
+	cntB, err := pgSQL.PendingScanCountByURL(ctx, urlB)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, cntB)
+
+	// Count for non-existing URL should be 0
+	cntC, err := pgSQL.PendingScanCountByURL(ctx, "https://no.such/url")
+	require.NoError(t, err)
+	require.EqualValues(t, 0, cntC)
 }

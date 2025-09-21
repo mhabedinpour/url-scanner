@@ -39,12 +39,6 @@ func DomainScanResultToV1Specs(in *domain.ScanResult) *v1specs.ScanResult {
 		if p.Server != "" {
 			page.Server = v1specs.NewOptString(p.Server)
 		}
-		if p.Status != 0 {
-			page.Status = v1specs.NewOptInt(p.Status)
-		}
-		if p.MimeType != "" {
-			page.MimeType = v1specs.NewOptString(p.MimeType)
-		}
 		out.Page = page
 	}
 	// Verdicts
