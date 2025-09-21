@@ -8,6 +8,8 @@ import (
 
 	"scanner/pkg/logger"
 	"scanner/pkg/serrors"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestMain(m *testing.M) {
@@ -21,18 +23,10 @@ func TestNewError_InternalOnPlainError(t *testing.T) {
 	ctx := context.Background()
 
 	res := h.NewError(ctx, errors.New("boom"))
-	if res == nil {
-		t.Fatalf("expected non-nil response")
-	}
-	if got, want := res.StatusCode, 500; got != want {
-		t.Fatalf("status = %d, want %d", got, want)
-	}
-	if got, want := res.Response.Code, serrors.ErrInternal.Error(); got != want {
-		t.Fatalf("code = %q, want %q", got, want)
-	}
-	if got, want := res.Response.Message, "internal error"; got != want {
-		t.Fatalf("message = %q, want %q", got, want)
-	}
+	require.NotNil(t, res)
+	require.Equal(t, 500, res.StatusCode)
+	require.Equal(t, serrors.ErrInternal.Error(), res.Response.Code)
+	require.Equal(t, "internal error", res.Response.Message)
 }
 
 func TestNewError_KindSentinelDirect_NotFound(t *testing.T) {
@@ -41,15 +35,9 @@ func TestNewError_KindSentinelDirect_NotFound(t *testing.T) {
 
 	// Pass the Kind sentinel directly
 	res := h.NewError(ctx, serrors.ErrNotFound)
-	if got, want := res.StatusCode, 404; got != want {
-		t.Fatalf("status = %d, want %d", got, want)
-	}
-	if got, want := res.Response.Code, serrors.ErrNotFound.Error(); got != want {
-		t.Fatalf("code = %q, want %q", got, want)
-	}
-	if got, want := res.Response.Message, "resource not found"; got != want {
-		t.Fatalf("message = %q, want %q", got, want)
-	}
+	require.Equal(t, 404, res.StatusCode)
+	require.Equal(t, serrors.ErrNotFound.Error(), res.Response.Code)
+	require.Equal(t, "resource not found", res.Response.Message)
 }
 
 func TestNewError_SemanticWithMessage_BadRequest(t *testing.T) {
@@ -58,15 +46,9 @@ func TestNewError_SemanticWithMessage_BadRequest(t *testing.T) {
 
 	err := serrors.With(serrors.ErrBadRequest, "invalid payload: missing url")
 	res := h.NewError(ctx, err)
-	if got, want := res.StatusCode, 400; got != want {
-		t.Fatalf("status = %d, want %d", got, want)
-	}
-	if got, want := res.Response.Code, serrors.ErrBadRequest.Error(); got != want {
-		t.Fatalf("code = %q, want %q", got, want)
-	}
-	if got, want := res.Response.Message, "invalid payload: missing url"; got != want {
-		t.Fatalf("message = %q, want %q", got, want)
-	}
+	require.Equal(t, 400, res.StatusCode)
+	require.Equal(t, serrors.ErrBadRequest.Error(), res.Response.Code)
+	require.Equal(t, "invalid payload: missing url", res.Response.Message)
 }
 
 func TestNewError_SemanticWrap_Unauthorized(t *testing.T) {
@@ -76,16 +58,10 @@ func TestNewError_SemanticWrap_Unauthorized(t *testing.T) {
 	cause := errors.New("bad token")
 	err := serrors.Wrap(serrors.ErrUnauthorized, cause, "unauthorized")
 	res := h.NewError(ctx, err)
-	if got, want := res.StatusCode, 401; got != want {
-		t.Fatalf("status = %d, want %d", got, want)
-	}
-	if got, want := res.Response.Code, serrors.ErrUnauthorized.Error(); got != want {
-		t.Fatalf("code = %q, want %q", got, want)
-	}
+	require.Equal(t, 401, res.StatusCode)
+	require.Equal(t, serrors.ErrUnauthorized.Error(), res.Response.Code)
 	// Should include provided message, not the cause
-	if got, want := res.Response.Message, "unauthorized"; got != want {
-		t.Fatalf("message = %q, want %q", got, want)
-	}
+	require.Equal(t, "unauthorized", res.Response.Message)
 }
 
 func TestNewError_InternalKind_GeneratesInternal(t *testing.T) {
@@ -93,13 +69,7 @@ func TestNewError_InternalKind_GeneratesInternal(t *testing.T) {
 	ctx := context.Background()
 
 	res := h.NewError(ctx, serrors.KindOnly(serrors.ErrInternal))
-	if got, want := res.StatusCode, 500; got != want {
-		t.Fatalf("status = %d, want %d", got, want)
-	}
-	if got, want := res.Response.Code, serrors.ErrInternal.Error(); got != want {
-		t.Fatalf("code = %q, want %q", got, want)
-	}
-	if got, want := res.Response.Message, "internal error"; got != want {
-		t.Fatalf("message = %q, want %q", got, want)
-	}
+	require.Equal(t, 500, res.StatusCode)
+	require.Equal(t, serrors.ErrInternal.Error(), res.Response.Code)
+	require.Equal(t, "internal error", res.Response.Message)
 }

@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"scanner/pkg/controller"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestWithCORS_Preflight(t *testing.T) {
@@ -18,27 +20,15 @@ func TestWithCORS_Preflight(t *testing.T) {
 
 	controller.WithCORS(next).ServeHTTP(rec, req)
 
-	if called {
-		t.Fatalf("next handler should not be called for OPTIONS preflight")
-	}
+	require.False(t, called, "next handler should not be called for OPTIONS preflight")
 	res := rec.Result()
-	if res.StatusCode != http.StatusNoContent {
-		t.Fatalf("expected status %d, got %d", http.StatusNoContent, res.StatusCode)
-	}
+	require.Equal(t, http.StatusNoContent, res.StatusCode)
 
 	// headers should be present
-	if got := res.Header.Get("Access-Control-Allow-Origin"); got != "*" {
-		t.Errorf("Access-Control-Allow-Origin = %q", got)
-	}
-	if got := res.Header.Get("Access-Control-Allow-Credentials"); got != "true" {
-		t.Errorf("Access-Control-Allow-Credentials = %q", got)
-	}
-	if got := res.Header.Get("Access-Control-Allow-Headers"); got == "" {
-		t.Errorf("Access-Control-Allow-Headers should not be empty")
-	}
-	if got := res.Header.Get("Access-Control-Allow-Methods"); got == "" {
-		t.Errorf("Access-Control-Allow-Methods should not be empty")
-	}
+	require.Equal(t, "*", res.Header.Get("Access-Control-Allow-Origin"))
+	require.Equal(t, "true", res.Header.Get("Access-Control-Allow-Credentials"))
+	require.NotEmpty(t, res.Header.Get("Access-Control-Allow-Headers"))
+	require.NotEmpty(t, res.Header.Get("Access-Control-Allow-Methods"))
 }
 
 func TestWithCORS_NormalRequest(t *testing.T) {
@@ -53,25 +43,13 @@ func TestWithCORS_NormalRequest(t *testing.T) {
 
 	controller.WithCORS(next).ServeHTTP(rec, req)
 
-	if !called {
-		t.Fatalf("next handler should be called for non-OPTIONS request")
-	}
+	require.True(t, called, "next handler should be called for non-OPTIONS request")
 	res := rec.Result()
-	if res.StatusCode != http.StatusTeapot {
-		t.Fatalf("expected status %d, got %d", http.StatusTeapot, res.StatusCode)
-	}
+	require.Equal(t, http.StatusTeapot, res.StatusCode)
 
 	// headers should be present
-	if got := res.Header.Get("Access-Control-Allow-Origin"); got != "*" {
-		t.Errorf("Access-Control-Allow-Origin = %q", got)
-	}
-	if got := res.Header.Get("Access-Control-Allow-Credentials"); got != "true" {
-		t.Errorf("Access-Control-Allow-Credentials = %q", got)
-	}
-	if got := res.Header.Get("Access-Control-Allow-Headers"); got == "" {
-		t.Errorf("Access-Control-Allow-Headers should not be empty")
-	}
-	if got := res.Header.Get("Access-Control-Allow-Methods"); got == "" {
-		t.Errorf("Access-Control-Allow-Methods should not be empty")
-	}
+	require.Equal(t, "*", res.Header.Get("Access-Control-Allow-Origin"))
+	require.Equal(t, "true", res.Header.Get("Access-Control-Allow-Credentials"))
+	require.NotEmpty(t, res.Header.Get("Access-Control-Allow-Headers"))
+	require.NotEmpty(t, res.Header.Get("Access-Control-Allow-Methods"))
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"scanner/internal/api/handler/v1handler"
@@ -52,44 +53,20 @@ func Test_toV1Result_Mapping(t *testing.T) {
 
 	out := v1handler.DomainScanResultToV1Specs(in)
 
-	if !out.Page.URL.IsSet() {
-		t.Fatalf("expected page.url to be set")
-	}
-	if got := out.Page.URL.Value.String(); got != "https://example.com/index.html" {
-		t.Fatalf("url = %q", got)
-	}
-	if got := out.Page.Domain.Value; got != "example.com" {
-		t.Fatalf("domain = %q", got)
-	}
-	if got := out.Page.IP.Value; got != "93.184.216.34" {
-		t.Fatalf("ip = %q", got)
-	}
-	if got := out.Page.Asn.Value; got != "AS15133" {
-		t.Fatalf("asn = %q", got)
-	}
-	if got := out.Page.Country.Value; got != "US" {
-		t.Fatalf("country = %q", got)
-	}
-	if got := out.Page.Server.Value; got != "nginx" {
-		t.Fatalf("server = %q", got)
-	}
-	if got := out.Page.Status.Value; got != 200 {
-		t.Fatalf("status = %d", got)
-	}
-	if got := out.Page.MimeType.Value; got != "text/html" {
-		t.Fatalf("mime = %q", got)
-	}
+	require.True(t, out.Page.URL.IsSet(), "expected page.url to be set")
+	require.Equal(t, "https://example.com/index.html", out.Page.URL.Value.String())
+	require.Equal(t, "example.com", out.Page.Domain.Value)
+	require.Equal(t, "93.184.216.34", out.Page.IP.Value)
+	require.Equal(t, "AS15133", out.Page.Asn.Value)
+	require.Equal(t, "US", out.Page.Country.Value)
+	require.Equal(t, "nginx", out.Page.Server.Value)
+	require.Equal(t, 200, out.Page.Status.Value)
+	require.Equal(t, "text/html", out.Page.MimeType.Value)
 
-	if !out.Verdicts.Malicious.Value {
-		t.Fatalf("malicious expected true")
-	}
-	if got := out.Verdicts.Score.Value; got != 42 {
-		t.Fatalf("score = %d", got)
-	}
+	require.True(t, out.Verdicts.Malicious.Value, "malicious expected true")
+	require.Equal(t, 42, out.Verdicts.Score.Value)
 
-	if got := out.Stats.Malicious.Value; got != 3 {
-		t.Fatalf("stats.malicious = %d", got)
-	}
+	require.Equal(t, 3, out.Stats.Malicious.Value)
 }
 
 func Test_toV1Result_OptionalFieldsUnset_WhenEmpty(t *testing.T) {
@@ -97,15 +74,9 @@ func Test_toV1Result_OptionalFieldsUnset_WhenEmpty(t *testing.T) {
 	in := &domain.ScanResult{}
 	out := v1handler.DomainScanResultToV1Specs(in)
 	// page is zero; Page fields should be zero-values
-	if (out.Page != v1specs.ScanResultPage{}) {
-		t.Fatalf("expected empty page struct, got %#v", out.Page)
-	}
-	if out.Verdicts.Malicious.IsSet() {
-		t.Fatalf("malicious should not be set by default")
-	}
-	if out.Stats.Malicious.IsSet() {
-		t.Fatalf("stats.malicious should not be set by default")
-	}
+	require.Equal(t, v1specs.ScanResultPage{}, out.Page, "expected empty page struct")
+	require.False(t, out.Verdicts.Malicious.IsSet(), "malicious should not be set by default")
+	require.False(t, out.Stats.Malicious.IsSet(), "stats.malicious should not be set by default")
 }
 
 func Test_toV1Specs_Success(t *testing.T) {
@@ -120,35 +91,19 @@ func Test_toV1Specs_Success(t *testing.T) {
 		UpdatedAt: now,
 	}
 	out, err := v1handler.DomainScanToV1Specs(in)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if out.ID != id {
-		t.Fatalf("id mismatch")
-	}
-	if out.URL.String() != "https://example.org/x" {
-		t.Fatalf("url mismatch: %s", out.URL.String())
-	}
-	if out.Status != v1specs.ScanStatus(domain.ScanStatusCompleted) {
-		t.Fatalf("status mismatch")
-	}
-	if out.Attempts != 2 {
-		t.Fatalf("attempts mismatch")
-	}
-	if !out.CreatedAt.Equal(now) {
-		t.Fatalf("createdAt mismatch")
-	}
-	if !out.UpdatedAt.IsSet() {
-		t.Fatalf("updatedAt should be set")
-	}
+	require.NoError(t, err)
+	require.Equal(t, id, out.ID)
+	require.Equal(t, "https://example.org/x", out.URL.String())
+	require.Equal(t, v1specs.ScanStatus(domain.ScanStatusCompleted), out.Status)
+	require.Equal(t, 2, out.Attempts)
+	require.True(t, out.CreatedAt.Equal(now), "createdAt mismatch")
+	require.True(t, out.UpdatedAt.IsSet(), "updatedAt should be set")
 }
 
 func Test_toV1Specs_InvalidURL_Error(t *testing.T) {
 	in := &domain.Scan{URL: "://bad url"}
 	_, err := v1handler.DomainScanToV1Specs(in)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestHandler_CreateScan(t *testing.T) {
@@ -169,16 +124,10 @@ func TestHandler_CreateScan(t *testing.T) {
 	m.EXPECT().Enqueue(ctx, userID, "https://e.com").Return(&scan, nil)
 
 	res, err := h.CreateScan(ctx, req)
-	if err != nil {
-		t.Fatalf("CreateScan error: %v", err)
-	}
-	if res == nil {
-		t.Fatalf("nil response")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, res)
 	got := res.(*v1specs.Scan)
-	if got.URL.String() != "https://e.com" {
-		t.Fatalf("URL mismatch: %s", got.URL.String())
-	}
+	require.Equal(t, "https://e.com", got.URL.String())
 }
 
 func TestHandler_DeleteScan(t *testing.T) {
@@ -194,12 +143,8 @@ func TestHandler_DeleteScan(t *testing.T) {
 	m.EXPECT().Delete(ctx, userID, domain.ScanID(id)).Return(nil)
 
 	res, err := h.DeleteScan(ctx, v1specs.DeleteScanParams{ID: id})
-	if err != nil {
-		t.Fatalf("DeleteScan error: %v", err)
-	}
-	if _, ok := res.(*v1specs.DeleteScanNoContent); !ok {
-		t.Fatalf("expected NoContent response, got %T", res)
-	}
+	require.NoError(t, err)
+	require.IsType(t, &v1specs.DeleteScanNoContent{}, res)
 }
 
 func TestHandler_GetScan(t *testing.T) {
@@ -215,13 +160,9 @@ func TestHandler_GetScan(t *testing.T) {
 	m.EXPECT().Result(ctx, userID, scan.ID).Return(&scan, nil)
 
 	res, err := h.GetScan(ctx, v1specs.GetScanParams{ID: uuid.UUID(scan.ID)})
-	if err != nil {
-		t.Fatalf("GetScan error: %v", err)
-	}
+	require.NoError(t, err)
 	got := res.(*v1specs.Scan)
-	if got.URL.String() != "https://abc.xyz" {
-		t.Fatalf("URL mismatch: %s", got.URL.String())
-	}
+	require.Equal(t, "https://abc.xyz", got.URL.String())
 }
 
 func TestHandler_ListScans_DefaultLimitAndCursor(t *testing.T) {
@@ -248,16 +189,11 @@ func TestHandler_ListScans_DefaultLimitAndCursor(t *testing.T) {
 	).Return(scans, next, nil)
 
 	res, err := h.ListScans(ctx, params)
-	if err != nil {
-		t.Fatalf("ListScans error: %v", err)
-	}
+	require.NoError(t, err)
 	lst := res.(*v1specs.ScanList)
-	if len(lst.Items) != 2 {
-		t.Fatalf("items len = %d", len(lst.Items))
-	}
-	if !lst.NextCursor.IsSet() || lst.NextCursor.Value != next {
-		t.Fatalf("expected next cursor %q, got %#v", next, lst.NextCursor)
-	}
+	require.Len(t, lst.Items, 2)
+	require.True(t, lst.NextCursor.IsSet())
+	require.Equal(t, next, lst.NextCursor.Value)
 }
 
 func TestHandler_ListScans_CustomLimit_NoNextCursor(t *testing.T) {
@@ -278,16 +214,10 @@ func TestHandler_ListScans_CustomLimit_NoNextCursor(t *testing.T) {
 	m.EXPECT().UserScans(ctx, userID, domain.ScanStatusPending, "c0", uint(5)).Return(scans, "", nil)
 
 	res, err := h.ListScans(ctx, params)
-	if err != nil {
-		t.Fatalf("ListScans error: %v", err)
-	}
+	require.NoError(t, err)
 	lst := res.(*v1specs.ScanList)
-	if len(lst.Items) != 0 {
-		t.Fatalf("expected empty list")
-	}
-	if lst.NextCursor.IsSet() {
-		t.Fatalf("next cursor should be unset when empty")
-	}
+	require.Empty(t, lst.Items)
+	require.False(t, lst.NextCursor.IsSet(), "next cursor should be unset when empty")
 }
 
 // We cannot directly call unexported functions from another package.

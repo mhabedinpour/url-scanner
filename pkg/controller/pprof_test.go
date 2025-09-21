@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"scanner/pkg/controller"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestPprofMux_Index(t *testing.T) {
@@ -13,12 +15,8 @@ func TestPprofMux_Index(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	res := rec.Result()
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.StatusCode)
-	}
-	if ct := res.Header.Get("Content-Type"); ct == "" {
-		t.Errorf("expected Content-Type to be set")
-	}
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	require.NotEmpty(t, res.Header.Get("Content-Type"))
 }
 
 func TestPprofMux_Cmdline_OK(t *testing.T) {
@@ -27,7 +25,5 @@ func TestPprofMux_Cmdline_OK(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	res := rec.Result()
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.StatusCode)
-	}
+	require.Equal(t, http.StatusOK, res.StatusCode)
 }

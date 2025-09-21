@@ -14,6 +14,8 @@ import (
 	"scanner/pkg/domain"
 	"scanner/pkg/serrors"
 	"scanner/pkg/storage"
+
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -62,9 +64,7 @@ func TestScanner_Enqueue_JobAdded(t *testing.T) {
 			func(_ context.Context, scans ...domain.Scan) ([]domain.Scan, error) {
 				// return the same scan with an ID
 				ret := scans
-				if len(ret) != 1 {
-					t.Fatalf("expected one scan input")
-				}
+				require.Len(t, ret, 1, "expected one scan input")
 				ret[0].ID = domain.ScanID{} // zero is fine for test
 
 				return ret, nil
@@ -75,18 +75,10 @@ func TestScanner_Enqueue_JobAdded(t *testing.T) {
 	})
 
 	scan, err := s.Enqueue(context.Background(), userID, url)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if scan == nil {
-		t.Fatalf("expected scan, got nil")
-	}
-	if scan.URL != url {
-		t.Fatalf("expected url %q got %q", url, scan.URL)
-	}
-	if scan.Status != domain.ScanStatusPending {
-		t.Fatalf("expected status PENDING, got %s", scan.Status)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, scan)
+	require.Equal(t, url, scan.URL)
+	require.Equal(t, domain.ScanStatusPending, scan.Status)
 }
 
 func TestScanner_Enqueue_UsesLastCompletedResult(t *testing.T) {
@@ -111,9 +103,8 @@ func TestScanner_Enqueue_UsesLastCompletedResult(t *testing.T) {
 		// Update the newly created scan to completed with that result
 		tx.EXPECT().UpdateScanByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, _ domain.ScanID, updates storage.ScanUpdates) (*domain.Scan, error) {
-				if updates.Status != domain.ScanStatusCompleted || updates.Result == nil {
-					t.Fatalf("expected completed update with result")
-				}
+				require.Equal(t, domain.ScanStatusCompleted, updates.Status)
+				require.NotNil(t, updates.Result, "expected completed update with result")
 				res := domain.Scan{Status: domain.ScanStatusCompleted, Result: *updates.Result}
 
 				return &res, nil
@@ -122,12 +113,8 @@ func TestScanner_Enqueue_UsesLastCompletedResult(t *testing.T) {
 	})
 
 	scan, err := s.Enqueue(context.Background(), userID, url)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if scan.Status != domain.ScanStatusCompleted {
-		t.Fatalf("expected status COMPLETED, got %s", scan.Status)
-	}
+	require.NoError(t, err)
+	require.Equal(t, domain.ScanStatusCompleted, scan.Status)
 }
 
 func TestScanner_Enqueue_PendingWhenJobExistsWithoutResult(t *testing.T) {
@@ -148,12 +135,8 @@ func TestScanner_Enqueue_PendingWhenJobExistsWithoutResult(t *testing.T) {
 	})
 
 	scan, err := s.Enqueue(context.Background(), userID, url)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if scan.Status != domain.ScanStatusPending {
-		t.Fatalf("expected status PENDING, got %s", scan.Status)
-	}
+	require.NoError(t, err)
+	require.Equal(t, domain.ScanStatusPending, scan.Status)
 }
 
 func TestScanner_Enqueue_InvalidURL(t *testing.T) {
@@ -161,12 +144,8 @@ func TestScanner_Enqueue_InvalidURL(t *testing.T) {
 	// No storage calls expected
 
 	_, err := s.Enqueue(context.Background(), domain.UserID{}, "http://[::1")
-	if err == nil {
-		t.Fatalf("expected error")
-	}
-	if !errors.Is(err, serrors.ErrBadRequest) {
-		t.Fatalf("expected ErrBadRequest, got %v", err)
-	}
+	require.Error(t, err)
+	require.ErrorIs(t, err, serrors.ErrBadRequest)
 	// ensure no calls were made on storage
 	st.EXPECT().WithTx(gomock.Any(), gomock.Any()).Times(0)
 }
@@ -179,9 +158,8 @@ func TestScanner_Enqueue_PropagatesErrors(t *testing.T) {
 	expectWithTx(t, ctrl, st, func(tx *mockstorage.MockAllStorage) {
 		tx.EXPECT().StoreScans(gomock.Any(), gomock.Any()).Return(nil, errors.New("store err"))
 	})
-	if _, err := s.Enqueue(context.Background(), userID, url); err == nil {
-		t.Fatalf("expected error from StoreScans")
-	}
+	_, err := s.Enqueue(context.Background(), userID, url)
+	require.Error(t, err, "expected error from StoreScans")
 
 	// error from AddJob
 	expectWithTx(t, ctrl, st, func(tx *mockstorage.MockAllStorage) {
@@ -192,9 +170,8 @@ func TestScanner_Enqueue_PropagatesErrors(t *testing.T) {
 		)
 		tx.EXPECT().AddJob(gomock.Any(), gomock.Any(), gomock.Nil()).Return(false, errors.New("add err"))
 	})
-	if _, err := s.Enqueue(context.Background(), userID, url); err == nil {
-		t.Fatalf("expected error from AddJob")
-	}
+	_, err = s.Enqueue(context.Background(), userID, url)
+	require.Error(t, err, "expected error from AddJob")
 
 	// error from LastCompletedScanByURL
 	expectWithTx(t, ctrl, st, func(tx *mockstorage.MockAllStorage) {
@@ -204,9 +181,8 @@ func TestScanner_Enqueue_PropagatesErrors(t *testing.T) {
 		tx.EXPECT().AddJob(gomock.Any(), gomock.Any(), gomock.Nil()).Return(false, nil)
 		tx.EXPECT().LastCompletedScanByURL(gomock.Any(), url).Return(nil, errors.New("last err"))
 	})
-	if _, err := s.Enqueue(context.Background(), userID, url); err == nil {
-		t.Fatalf("expected error from LastCompletedScanByURL")
-	}
+	_, err = s.Enqueue(context.Background(), userID, url)
+	require.Error(t, err, "expected error from LastCompletedScanByURL")
 
 	// error from UpdateScanByID
 	expectWithTx(t, ctrl, st, func(tx *mockstorage.MockAllStorage) {
@@ -217,9 +193,8 @@ func TestScanner_Enqueue_PropagatesErrors(t *testing.T) {
 		tx.EXPECT().LastCompletedScanByURL(gomock.Any(), url).Return(&domain.Scan{Result: domain.ScanResult{}}, nil)
 		tx.EXPECT().UpdateScanByID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("update err"))
 	})
-	if _, err := s.Enqueue(context.Background(), userID, url); err == nil {
-		t.Fatalf("expected error from UpdateScanByID")
-	}
+	_, err = s.Enqueue(context.Background(), userID, url)
+	require.Error(t, err, "expected error from UpdateScanByID")
 }
 
 func TestScanner_UserScans_SuccessAndPagination(t *testing.T) {
@@ -241,23 +216,17 @@ func TestScanner_UserScans_SuccessAndPagination(t *testing.T) {
 	st.EXPECT().UserScans(gomock.Any(), userID, status, cursorTime, uint(10)).Return(page, nil)
 
 	scans, next, err := s.UserScans(context.Background(), userID, status, cursor, 10)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(scans) != 1 || scans[0].URL != "https://a" {
-		t.Fatalf("unexpected scans: %+v", scans)
-	}
-	if next == "" {
-		t.Fatalf("expected next cursor, got empty")
-	}
+	require.NoError(t, err)
+	require.Len(t, scans, 1)
+	require.Equal(t, "https://a", scans[0].URL)
+	require.NotEmpty(t, next, "expected next cursor")
 }
 
 func TestScanner_UserScans_InvalidCursor(t *testing.T) {
 	_, _, s := newTestScanner(t)
 	_, _, err := s.UserScans(context.Background(), domain.UserID{}, "", "not-a-time", 5)
-	if err == nil || !errors.Is(err, serrors.ErrBadRequest) {
-		t.Fatalf("expected ErrBadRequest, got %v", err)
-	}
+	require.Error(t, err)
+	require.ErrorIs(t, err, serrors.ErrBadRequest)
 }
 
 func TestScanner_Result(t *testing.T) {
@@ -268,23 +237,20 @@ func TestScanner_Result(t *testing.T) {
 	// found
 	st.EXPECT().ScanByID(gomock.Any(), userID, id).Return(&domain.Scan{URL: "https://x"}, nil)
 	scan, err := s.Result(context.Background(), userID, id)
-	if err != nil || scan == nil || scan.URL != "https://x" {
-		t.Fatalf("unexpected: scan=%+v err=%v", scan, err)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, scan)
+	require.Equal(t, "https://x", scan.URL)
 
 	// not found
 	st.EXPECT().ScanByID(gomock.Any(), userID, id).Return(nil, nil)
 	_, err = s.Result(context.Background(), userID, id)
-	if err == nil || !errors.Is(err, serrors.ErrNotFound) {
-		t.Fatalf("expected ErrNotFound, got %v", err)
-	}
+	require.Error(t, err)
+	require.ErrorIs(t, err, serrors.ErrNotFound)
 
 	// storage error
 	st.EXPECT().ScanByID(gomock.Any(), userID, id).Return(nil, errors.New("boom"))
 	_, err = s.Result(context.Background(), userID, id)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestScanner_Delete(t *testing.T) {
@@ -294,18 +260,13 @@ func TestScanner_Delete(t *testing.T) {
 
 	// success
 	st.EXPECT().DeleteScan(gomock.Any(), userID, id).Return(&domain.Scan{}, nil)
-	if err := s.Delete(context.Background(), userID, id); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, s.Delete(context.Background(), userID, id))
 	// not found
 	st.EXPECT().DeleteScan(gomock.Any(), userID, id).Return(nil, nil)
 	err := s.Delete(context.Background(), userID, id)
-	if err == nil || !errors.Is(err, serrors.ErrNotFound) {
-		t.Fatalf("expected ErrNotFound, got %v", err)
-	}
+	require.Error(t, err)
+	require.ErrorIs(t, err, serrors.ErrNotFound)
 	// storage error
 	st.EXPECT().DeleteScan(gomock.Any(), userID, id).Return(nil, errors.New("boom"))
-	if err := s.Delete(context.Background(), userID, id); err == nil {
-		t.Fatalf("expected error, got nil")
-	}
+	require.Error(t, s.Delete(context.Background(), userID, id))
 }

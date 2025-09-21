@@ -3,6 +3,8 @@ package scanner_test
 import (
 	"scanner/internal/scanner"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNormalizeURL(t *testing.T) {
@@ -78,14 +80,10 @@ func TestNormalizeURL(t *testing.T) {
 	for _, tc := range cases {
 		got, err := scanner.NormalizeURL(tc.in)
 		if tc.ok {
-			if err != nil {
-				t.Fatalf("%s: unexpected error: %v", tc.name, err)
-			}
-			if got != tc.out {
-				t.Errorf("%s: got %q, want %q", tc.name, got, tc.out)
-			}
-		} else if err == nil {
-			t.Errorf("%s: expected error, got none (result %q)", tc.name, got)
+			require.NoErrorf(t, err, "%s: unexpected error", tc.name)
+			require.Equalf(t, tc.out, got, "%s: normalized URL mismatch", tc.name)
+		} else {
+			require.Errorf(t, err, "%s: expected error, got none (result %q)", tc.name, got)
 		}
 	}
 }

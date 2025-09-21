@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 	"scanner/pkg/domain"
 	"testing"
 	"time"
@@ -14,6 +13,8 @@ import (
 	"scanner/internal/api/handler/v1handler"
 	"scanner/internal/api/specs/v1specs"
 	"scanner/pkg/serrors"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -23,13 +24,9 @@ import (
 func genRSAKeys(tb testing.TB) (*rsa.PrivateKey, string) {
 	tb.Helper()
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		tb.Fatalf("failed to generate RSA key: %v", err)
-	}
+	require.NoError(tb, err, "failed to generate RSA key")
 	pubASN1, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
-	if err != nil {
-		tb.Fatalf("failed to marshal public key: %v", err)
-	}
+	require.NoError(tb, err, "failed to marshal public key")
 	pubPEM := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubASN1})
 
 	return priv, string(pubPEM)
@@ -38,9 +35,7 @@ func genRSAKeys(tb testing.TB) (*rsa.PrivateKey, string) {
 func newSecHandlerForTest(t *testing.T, pubPEM string) *v1handler.SecHandler {
 	t.Helper()
 	sh, err := v1handler.NewSecHandler(&v1handler.SecHandlerOptions{PublicKey: pubPEM})
-	if err != nil {
-		t.Fatalf("NewSecHandler failed: %v", err)
-	}
+	require.NoError(t, err, "NewSecHandler failed")
 
 	return sh
 }
@@ -55,9 +50,7 @@ func signJWTRS256(tb testing.TB, priv *rsa.PrivateKey, sub string, issuedAt time
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	signed, err := token.SignedString(priv)
-	if err != nil {
-		tb.Fatalf("failed to sign token: %v", err)
-	}
+	require.NoError(tb, err, "failed to sign token")
 
 	return signed
 }
@@ -71,22 +64,14 @@ func TestHandleBearerAuth_ValidToken(t *testing.T) {
 	tkn := signJWTRS256(t, priv, uid.String(), now, now.Add(1*time.Hour))
 
 	ctx, err := sh.HandleBearerAuth(context.Background(), "", v1specs.BearerAuth{Token: tkn})
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	require.NoError(t, err)
 
 	// verify user id stored in context
 	v := ctx.Value(v1handler.UserIDKey)
-	if v == nil {
-		t.Fatalf("expected userID in context, got nil")
-	}
+	require.NotNil(t, v, "expected userID in context")
 	got, ok := v.(domain.UserID)
-	if !ok {
-		t.Fatalf("userID in context has wrong type: %T", v)
-	}
-	if got != domain.UserID(uid) {
-		t.Fatalf("userID mismatch, want %s, got %s", uid, got)
-	}
+	require.True(t, ok, "userID in context has wrong type: %T", v)
+	require.Equal(t, domain.UserID(uid), got)
 }
 
 func TestHandleBearerAuth_InvalidSignature(t *testing.T) {
@@ -99,12 +84,8 @@ func TestHandleBearerAuth_InvalidSignature(t *testing.T) {
 	tkn := signJWTRS256(t, privOther, uuid.NewString(), now, now.Add(time.Hour))
 
 	_, err := sh.HandleBearerAuth(context.Background(), "", v1specs.BearerAuth{Token: tkn})
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !errors.Is(err, serrors.ErrUnauthorized) {
-		t.Fatalf("expected unauthorized error kind, got %v", err)
-	}
+	require.Error(t, err)
+	require.ErrorIs(t, err, serrors.ErrUnauthorized)
 }
 
 func TestHandleBearerAuth_ExpiredToken(t *testing.T) {
@@ -115,12 +96,8 @@ func TestHandleBearerAuth_ExpiredToken(t *testing.T) {
 	tkn := signJWTRS256(t, priv, uuid.NewString(), now.Add(-2*time.Hour), now.Add(-1*time.Hour))
 
 	_, err := sh.HandleBearerAuth(context.Background(), "", v1specs.BearerAuth{Token: tkn})
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !errors.Is(err, serrors.ErrUnauthorized) {
-		t.Fatalf("expected unauthorized error kind, got %v", err)
-	}
+	require.Error(t, err)
+	require.ErrorIs(t, err, serrors.ErrUnauthorized)
 }
 
 func TestHandleBearerAuth_InvalidSubject(t *testing.T) {
@@ -132,12 +109,8 @@ func TestHandleBearerAuth_InvalidSubject(t *testing.T) {
 	tkn := signJWTRS256(t, priv, "not-a-uuid", now, now.Add(time.Hour))
 
 	_, err := sh.HandleBearerAuth(context.Background(), "", v1specs.BearerAuth{Token: tkn})
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !errors.Is(err, serrors.ErrUnauthorized) {
-		t.Fatalf("expected unauthorized error kind, got %v", err)
-	}
+	require.Error(t, err)
+	require.ErrorIs(t, err, serrors.ErrUnauthorized)
 }
 
 func TestHandleBearerAuth_WrongAlgorithm(t *testing.T) {
@@ -154,15 +127,9 @@ func TestHandleBearerAuth_WrongAlgorithm(t *testing.T) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString([]byte("secret"))
-	if err != nil {
-		t.Fatalf("failed to sign HS256 token: %v", err)
-	}
+	require.NoError(t, err, "failed to sign HS256 token")
 
 	_, err = sh.HandleBearerAuth(context.Background(), "", v1specs.BearerAuth{Token: signed})
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !errors.Is(err, serrors.ErrUnauthorized) {
-		t.Fatalf("expected unauthorized error kind, got %v", err)
-	}
+	require.Error(t, err)
+	require.ErrorIs(t, err, serrors.ErrUnauthorized)
 }
