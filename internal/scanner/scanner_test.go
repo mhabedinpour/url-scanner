@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"scanner/internal/scanner"
+	"scanner/pkg/logger"
 	mockurlscanner "scanner/pkg/urlscanner/mock"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"scanner/pkg/domain"
 	"scanner/pkg/serrors"
 	"scanner/pkg/storage"
+	"scanner/pkg/urlscanner"
 
 	"github.com/stretchr/testify/require"
 )
@@ -28,10 +30,22 @@ func newTestScanner(t *testing.T) (*gomock.Controller, *mockstorage.MockStorage,
 
 	ctrl := gomock.NewController(t)
 	st := mockstorage.NewMockStorage(ctrl)
-	urlScanner := mockurlscanner.NewMockClient(ctrl)
-	s := scanner.New(st, urlScanner, scanner.Options{MaxAttempts: 3, ResultCacheTTL: time.Hour})
+	s := scanner.New(st, nil, scanner.Options{MaxAttempts: 3, ResultCacheTTL: time.Hour})
 
 	return ctrl, st, s
+}
+
+// Like newTestScanner, but also returns the urlscanner mock for direct expectations.
+func newTestScannerWithURLScanner(t *testing.T) (
+	*mockstorage.MockStorage, *mockurlscanner.MockClient, scanner.Scanner) {
+	t.Helper()
+	logger.Setup("debug")
+	ctrl := gomock.NewController(t)
+	st := mockstorage.NewMockStorage(ctrl)
+	urlClient := mockurlscanner.NewMockClient(ctrl)
+	s := scanner.New(st, urlClient, scanner.Options{MaxAttempts: 3, ResultCacheTTL: time.Hour})
+
+	return st, urlClient, s
 }
 
 // helper to wire Storage.WithTx to execute callback with a MockAllStorage.
@@ -271,4 +285,99 @@ func TestScanner_Delete(t *testing.T) {
 	// storage error
 	st.EXPECT().DeleteScan(gomock.Any(), userID, id).Return(nil, errors.New("boom"))
 	require.Error(t, s.Delete(context.Background(), userID, id))
+}
+
+// ----------------------- Tests for Scan -----------------------
+
+func TestScanner_Scan_NoPendingConflict(t *testing.T) {
+	st, urlClient, s := newTestScannerWithURLScanner(t)
+	// no pending scans
+	st.EXPECT().PendingScanCountByURL(gomock.Any(), url).Return(int64(0), nil)
+	// ensure urlscanner is not called
+	urlClient.EXPECT().SubmitURL(gomock.Any(), gomock.Any()).Times(0)
+
+	_, err := s.Scan(context.Background(), url)
+	require.Error(t, err)
+	require.ErrorIs(t, err, serrors.ErrConflict)
+}
+
+func TestScanner_Scan_PendingCountError(t *testing.T) {
+	st, _, s := newTestScannerWithURLScanner(t)
+	st.EXPECT().PendingScanCountByURL(gomock.Any(), url).Return(int64(0), errors.New("count boom"))
+	_, err := s.Scan(context.Background(), url)
+	require.Error(t, err)
+}
+
+func TestScanner_Scan_Success(t *testing.T) {
+	st, urlClient, s := newTestScannerWithURLScanner(t)
+	st.EXPECT().PendingScanCountByURL(gomock.Any(), url).Return(int64(2), nil)
+	// urlscanner returns ID and RL
+	rl := urlscanner.RateLimitStatus{Limit: 100, Remaining: 50, ResetAt: time.Now()}
+	urlClient.EXPECT().SubmitURL(gomock.Any(), url).Return(urlscanner.SubmitRes{ID: "scan123"}, rl, nil)
+	// first poll returns result right away
+	urlClient.EXPECT().Result(gomock.Any(), "scan123").Return(&domain.ScanResult{}, nil)
+	// expect storage updated to completed with result
+	st.EXPECT().UpdatePendingScansByURL(gomock.Any(), url, gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, updates storage.ScanUpdates) error {
+			require.Equal(t, domain.ScanStatusCompleted, updates.Status)
+			require.NotNil(t, updates.Result)
+
+			return nil
+		},
+	)
+
+	rlOut, err := s.Scan(context.Background(), url)
+	require.NoError(t, err)
+	require.Equal(t, rl, rlOut)
+}
+
+func TestScanner_Scan_SubmitErrorUpdatesFailed(t *testing.T) {
+	st, urlClient, s := newTestScannerWithURLScanner(t)
+	st.EXPECT().PendingScanCountByURL(gomock.Any(), url).Return(int64(1), nil)
+	// submit fails
+	rl := urlscanner.RateLimitStatus{Limit: 100, Remaining: 0, ResetAt: time.Now()}
+	urlClient.EXPECT().SubmitURL(gomock.Any(), url).Return(urlscanner.SubmitRes{}, rl, errors.New("provider down"))
+	// expect failed update with last error and max attempts
+	st.EXPECT().UpdatePendingScansByURL(gomock.Any(), url, gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, updates storage.ScanUpdates) error {
+			require.Equal(t, domain.ScanStatusFailed, updates.Status)
+			require.NotNil(t, updates.LastError)
+			require.Equal(t, 3, updates.MaxAttempts)
+
+			return nil
+		},
+	)
+
+	_, err := s.Scan(context.Background(), url)
+	require.Error(t, err)
+}
+
+func TestScanner_Scan_RateLimitedNoFailedUpdate(t *testing.T) {
+	st, urlClient, s := newTestScannerWithURLScanner(t)
+	st.EXPECT().PendingScanCountByURL(gomock.Any(), url).Return(int64(1), nil)
+	// simulate rate-limited error on submit; submit can return wrapped rate-limit error
+	rl := urlscanner.RateLimitStatus{Limit: 100, Remaining: 0, ResetAt: time.Now()}
+	rateErr := serrors.With(serrors.ErrRateLimited, "rate limited")
+	urlClient.EXPECT().SubmitURL(gomock.Any(), url).Return(urlscanner.SubmitRes{}, rl, rateErr)
+	// ensure we do NOT mark failed when rate-limited
+	st.EXPECT().UpdatePendingScansByURL(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	rlOut, err := s.Scan(context.Background(), url)
+	require.Error(t, err)
+	require.ErrorIs(t, err, serrors.ErrRateLimited)
+	require.Equal(t, rl, rlOut)
+}
+
+func TestScanner_Scan_UpdateOnSuccessError(t *testing.T) {
+	st, urlClient, s := newTestScannerWithURLScanner(t)
+	st.EXPECT().PendingScanCountByURL(gomock.Any(), url).Return(int64(1), nil)
+	// submit ok
+	rl := urlscanner.RateLimitStatus{Limit: 100, Remaining: 50, ResetAt: time.Now()}
+	urlClient.EXPECT().SubmitURL(gomock.Any(), url).Return(urlscanner.SubmitRes{ID: "x"}, rl, nil)
+	urlClient.EXPECT().Result(gomock.Any(), "x").Return(&domain.ScanResult{}, nil)
+	// storage update fails
+	st.EXPECT().UpdatePendingScansByURL(gomock.Any(), url, gomock.Any()).Return(errors.New("update fail"))
+
+	_, err := s.Scan(context.Background(), url)
+	require.Error(t, err)
 }

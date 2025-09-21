@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"scanner/internal/config"
 	"scanner/pkg/domain"
@@ -176,53 +177,85 @@ func (s scanner) Delete(ctx context.Context, userID domain.UserID, scanID domain
 	return nil
 }
 
-// TODO: tests and docs
-
-func (s scanner) Scan(ctx context.Context, URL string) error {
+// Scan processes all pending scans for the given URL.
+//
+// It first verifies there are still pending scans for the URL (to avoid
+// running orphaned jobs after a user deletes their scan request). If there are
+// none, it returns a conflict error and exits without side effects.
+//
+// When pending scans exist, Scan submits the URL to the external urlscanner
+// provider and waits for the result. On success, it marks all pending scans for
+// the URL as completed and stores the result. On failure, it marks them as
+// failed with the last error recorded.
+//
+// The method returns the provider's urlscanner.RateLimitStatus to allow
+// callers (e.g., background workers) to adjust scheduling/backoff according to
+// rate limiting information.
+//
+// This method is designed to be invoked by a background worker and to be
+// idempotent with respect to concurrently deleted scan requests.
+func (s scanner) Scan(ctx context.Context, URL string) (urlscanner.RateLimitStatus, error) {
 	// makes sure there are still pending scans for the URL before processing,
 	// this is required because during scan deletion we do not cancel jobs
 	pendingCount, err := s.storage.PendingScanCountByURL(ctx, URL)
 	if err != nil {
-		return fmt.Errorf("could not get pending scan count: %w", err)
+		return urlscanner.RateLimitStatus{}, fmt.Errorf("could not get pending scan count: %w", err)
 	}
 	if pendingCount <= 0 {
 		logger.Warn(ctx, "no pending scans for URL, skipping")
 
-		return serrors.With(serrors.ErrConflict, "no pending scans for URL")
+		return urlscanner.RateLimitStatus{}, serrors.With(serrors.ErrConflict, "no pending scans for URL")
 	}
 
-	res, err := s.submitURLAndPoll(ctx, URL)
+	res, RLStatus, err := s.submitURLAndPoll(ctx, URL)
 	if err != nil {
-		lastErr := err.Error()
-		if err := s.storage.UpdatePendingScansByURL(ctx, URL, storage.ScanUpdates{
-			Status:      domain.ScanStatusFailed,
-			LastError:   &lastErr,
-			MaxAttempts: s.options.MaxAttempts,
-		}); err != nil {
-			// just log the error and continue
-			logger.Error(ctx, "error updating scan", zap.Error(err))
+		if !errors.Is(err, serrors.ErrRateLimited) {
+			lastErr := err.Error()
+			if err := s.storage.UpdatePendingScansByURL(ctx, URL, storage.ScanUpdates{
+				Status:      domain.ScanStatusFailed,
+				LastError:   &lastErr,
+				MaxAttempts: s.options.MaxAttempts,
+			}); err != nil {
+				// just log the error and continue
+				logger.Error(ctx, "error updating scan", zap.Error(err))
+			}
 		}
 
-		return err
+		return RLStatus, err
 	}
 
 	if err := s.storage.UpdatePendingScansByURL(ctx, URL, storage.ScanUpdates{
 		Status: domain.ScanStatusCompleted,
 		Result: res,
 	}); err != nil {
-		return fmt.Errorf("could not update scan: %w", err)
+		return RLStatus, fmt.Errorf("could not update scan: %w", err)
 	}
 
-	// TODO: rate limit errors
-
-	return nil
+	return RLStatus, nil
 }
 
-func (s scanner) submitURLAndPoll(ctx context.Context, URL string) (*domain.ScanResult, error) {
+// submitURLAndPoll submits the URL to the urlscanner provider and polls for
+// the final result using exponential backoff until success or timeout.
+//
+// On success, it returns the scan result along with the provider's
+// urlscanner.RateLimitStatus. On failure (submission error, polling error that
+// never resolves, or context timeout), it returns a non-nil error. In all
+// cases, the returned RateLimitStatus reflects the last known rate limit
+// information from the provider, allowing callers to adapt scheduling.
+//
+// Poll timing is controlled by the following constants:
+//   - scanResultPollInitialDelay: delay before the first poll attempt
+//   - scanResultPollIntervalBase: starting backoff interval
+//   - scanResultPollIntervalMax: maximum backoff interval cap
+//   - scanResultPollTimeout: overall timeout for the polling operation
+func (s scanner) submitURLAndPoll(
+	ctx context.Context,
+	URL string,
+) (*domain.ScanResult, urlscanner.RateLimitStatus, error) {
 	logger.Info(ctx, "submitting URL to urlscanner")
-	scanRes, _, err := s.urlScanner.SubmitURL(ctx, URL)
+	scanRes, RLStatus, err := s.urlScanner.SubmitURL(ctx, URL)
 	if err != nil {
-		return nil, fmt.Errorf("could not submit URL: %w", err)
+		return nil, RLStatus, fmt.Errorf("could not submit URL: %w", err)
 	}
 
 	// initial delay
@@ -239,7 +272,7 @@ func (s scanner) submitURLAndPoll(ctx context.Context, URL string) (*domain.Scan
 		if err == nil {
 			logger.Debug(ctx, "received results from urlscanner")
 
-			return result, nil
+			return result, RLStatus, nil
 		}
 
 		logger.Debug(ctx, "error reading results from urlscanner, will retry...", zap.Error(err))
@@ -249,7 +282,7 @@ func (s scanner) submitURLAndPoll(ctx context.Context, URL string) (*domain.Scan
 			// double delay each time with a cap
 			delay = min(delay*2, scanResultPollIntervalMax)
 		case <-ctx.Done():
-			return nil, fmt.Errorf("timeout waiting for results: %w", ctx.Err())
+			return nil, RLStatus, fmt.Errorf("timeout waiting for results: %w", ctx.Err())
 		}
 	}
 }

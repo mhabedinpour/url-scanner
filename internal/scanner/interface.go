@@ -4,6 +4,7 @@ package scanner
 import (
 	"context"
 	"scanner/pkg/domain"
+	"scanner/pkg/urlscanner"
 )
 
 // Scanner is the main interface for scheduling URL scans and querying their results.
@@ -34,6 +35,6 @@ type Scanner interface {
 	// exist, a not-found error is returned.
 	Delete(ctx context.Context, userID domain.UserID, scanID domain.ScanID) error
 
-	// Scan scans the given URL, waits for results and store results in the database.
-	Scan(ctx context.Context, URL string) error
+	// Scan scans the given URL, waits for results, and store results in the database.
+	Scan(ctx context.Context, URL string) (urlscanner.RateLimitStatus, error)
 }

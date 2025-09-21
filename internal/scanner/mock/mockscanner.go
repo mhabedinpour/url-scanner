@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 	domain "scanner/pkg/domain"
+	urlscanner "scanner/pkg/urlscanner"
 
 	gomock "go.uber.org/mock/gomock"
 )
@@ -86,11 +87,12 @@ func (mr *MockScannerMockRecorder) Result(ctx, userID, scanID any) *gomock.Call 
 }
 
 // Scan mocks base method.
-func (m *MockScanner) Scan(ctx context.Context, URL string) error {
+func (m *MockScanner) Scan(ctx context.Context, URL string) (urlscanner.RateLimitStatus, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Scan", ctx, URL)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(urlscanner.RateLimitStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Scan indicates an expected call of Scan.
