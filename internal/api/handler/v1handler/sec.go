@@ -39,7 +39,7 @@ const UserIDKey controller.CtxKey = "userID"
 func GetUserIDFromContext(ctx context.Context) domain.UserID {
 	userID, ok := ctx.Value(UserIDKey).(domain.UserID)
 	if !ok {
-		// should happen because of the jwt middleware
+		// should not happen because of the jwt middleware
 		panic("userID not found in context")
 	}
 

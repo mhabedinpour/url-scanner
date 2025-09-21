@@ -76,6 +76,7 @@ func runMigrations(db *sql.DB, migrationsDir string) error {
 }
 
 func setupTestDB(t *testing.T) (*postgres.PgSQL, func()) {
+	// TODO: setup a global test db and share between tests
 	t.Helper()
 	ctx := context.Background()
 

@@ -12,6 +12,7 @@ import "context"
 // other narrower interfaces such as ScanStorage.
 type AllStorage interface {
 	ScanStorage
+	JobStorage
 }
 
 // TxStorage describes a storage handle that operates within a database
