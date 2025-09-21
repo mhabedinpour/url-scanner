@@ -1,5 +1,5 @@
 # URL Scanner Service Configuration
-# This is a sample configuration file generated based on the Config struct
+# This is a sample configuration file generated based on the Config struct in internal/config/config.go
 
 # Environment specifies the current running environment (development, production, etc.)
 environment: development
@@ -32,12 +32,36 @@ database:
   host: localhost
   port: 5432
   sslMode: disable
-  name: mydatabase
+  # Name of the database to connect to
+  name: scanner
   # Connection pool settings
   maxOpenConnections: 10
   maxIdleConnections: 8
   connMaxLifetime: 3m
   connMaxIdleTime: 3m
 
+# JWT configuration for signing and verifying tokens
+jwt:
+  # PEM-encoded public key used to verify JWT signatures
+  publicKey: ""
+  # PEM-encoded private key used to sign JWTs
+  privateKey: ""
+
+# Scanner subsystem configuration
+scanner:
+  # Maximum number of attempts for a single scan job before giving up
+  maxAttempts: 5
+  # Duration for which scan results are cached and reused
+  resultCacheTtl: 1h
+  # API key used to authenticate with urlscan.io
+  urlscanioApiKey: ""
+
+# Background worker configuration
+worker:
+  # Maximum duration allowed for a single job execution
+  jobTimeout: 1m
+  # Number of jobs that can be processed concurrently
+  jobConcurrency: 10
+
 # Maximum duration to wait for ongoing requests to complete during shutdown
-gracefulShutdownTimeout: 30s
+gracefulShutdownTimeout: 10s

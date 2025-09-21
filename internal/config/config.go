@@ -58,17 +58,31 @@ type Config struct {
 		ConnMaxIdleTime time.Duration `env:"DATABASE_CONNECTION_MAX_IDLE_TIME" env-default:"3m" yaml:"connMaxIdleTime"`
 	} `yaml:"database"`
 
-	// TODO: docs
+	// JWT contains keys used for signing and verifying JSON Web Tokens
 	JWT struct {
-		PublicKey  string `env:"JWT_PUBLIC_KEY"  yaml:"publicKey"`
+		// PublicKey is the PEM-encoded public key used to verify JWT signatures
+		PublicKey string `env:"JWT_PUBLIC_KEY" yaml:"publicKey"`
+		// PrivateKey is the PEM-encoded private key used to sign JWTs
 		PrivateKey string `env:"JWT_PRIVATE_KEY" yaml:"privateKey"`
 	} `yaml:"jwt"`
 
+	// Scanner contains configuration for the URL scanning subsystem
 	Scanner struct {
-		MaxAttempts     int           `env:"SCANNER_MAX_ATTEMPTS"       env-default:"5"        yaml:"maxAttempts"`
-		ResultCacheTTL  time.Duration `env:"SCANNER_RESULT_CACHE_TTL"   env-default:"1h"       yaml:"resultCacheTtl"`
-		UrlscanioAPIKey string        `env:"SCANNER_URLSCAN_IO_API_KEY" yaml:"urlscanioApiKey"`
+		// MaxAttempts is the maximum number of attempts for a single scan job before giving up
+		MaxAttempts int `env:"SCANNER_MAX_ATTEMPTS" env-default:"5" yaml:"maxAttempts"`
+		// ResultCacheTTL is the duration for which scan results are cached and reused
+		ResultCacheTTL time.Duration `env:"SCANNER_RESULT_CACHE_TTL" env-default:"1h" yaml:"resultCacheTtl"`
+		// UrlscanioAPIKey is the API key used to authenticate with urlscan.io
+		UrlscanioAPIKey string `env:"SCANNER_URLSCAN_IO_API_KEY" yaml:"urlscanioApiKey"`
 	} `yaml:"scanner"`
+
+	// Worker contains configuration for background job processing
+	Worker struct {
+		// JobTimeout is the maximum duration allowed for a single job execution
+		JobTimeout time.Duration `env:"WORKER_JOB_TIMEOUT" env-default:"1m" yaml:"jobTimeout"`
+		// JobConcurrency is the number of jobs that can be processed concurrently
+		JobConcurrency int `env:"WORKER_JOB_CONCURRENCY" env-default:"10" yaml:"jobConcurrency"`
+	} `yaml:"worker"`
 
 	// GracefulShutdownTimeout is the maximum duration to wait for ongoing requests to complete during shutdown
 	GracefulShutdownTimeout time.Duration `env:"GRACEFUL_SHUTDOWN_TIMEOUT" env-default:"10s" yaml:"gracefulShutdownTimeout"` //nolint: lll
