@@ -13,7 +13,6 @@ import (
 	"scanner/pkg/logger"
 	"scanner/pkg/urlscanner/urlscanio"
 	"syscall"
-	"time"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -56,13 +55,14 @@ func scanCommand(cfg *config.Config) *cobra.Command {
 			strg, closeStrg := getPostgres(ctx, cfg)
 			defer closeStrg()
 
-			scannerSvc := scanner.New(strg, urlscanio.New(&http.Client{
-				Transport: http.DefaultTransport,
-				Timeout:   time.Minute, // TODO: make configurable
-			}, cfg.Scanner.UrlscanioAPIKey), scanner.NewOptions(cfg))
+			scannerSvc := scanner.New(
+				strg,
+				urlscanio.New(http.DefaultClient, cfg.Scanner.UrlscanioAPIKey),
+				scanner.NewOptions(cfg),
+			)
 
 			// TODO: move workers to separate command
-			workerClient, err := worker.Start(ctx, strg.Pool, scannerSvc)
+			workerClient, err := worker.Start(ctx, strg.Pool, scannerSvc, worker.NewOptions(cfg))
 			if err != nil {
 				logger.Fatal(ctx, "could not start worker", zap.Error(err))
 			}

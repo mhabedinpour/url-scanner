@@ -40,6 +40,9 @@ func ParseRateLimit(h http.Header) (urlscanner.RateLimitStatus, error) {
 	remaining := atoi(h.Get("X-Rate-Limit-Remaining"))
 
 	resetStr := h.Get("X-Rate-Limit-Reset")
+	if resetStr == "" {
+		return urlscanner.RateLimitStatus{Limit: limit, Remaining: remaining, ResetAt: time.Time{}}, nil
+	}
 	resetAt, err := time.Parse(time.RFC3339Nano, resetStr)
 	if err != nil {
 		return urlscanner.RateLimitStatus{}, fmt.Errorf("could not parse reset at: %w", err)
