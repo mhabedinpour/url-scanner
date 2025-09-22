@@ -143,11 +143,15 @@ func (u *URLScannerWorker) requestFinished(ctx context.Context, newRLStatus urls
 		u.inFlightRequests = 0
 	}
 
-	// If other goroutines are blocked in reserveRL, try to wake exactly one without
-	// blocking this goroutine. If no one is waiting, the signal is dropped.
-	select {
-	case u.requestFinishedChan <- struct{}{}:
-	default:
+	// If other goroutines are blocked in reserveRL, try to wake as many
+	// as possible. If no one is waiting, the signal is dropped.
+l:
+	for {
+		select {
+		case u.requestFinishedChan <- struct{}{}:
+		default:
+			break l
+		}
 	}
 
 	// If the call didn't return any RL info, don't change our view.
@@ -234,10 +238,14 @@ func (u *URLScannerWorker) reserveRL(ctx context.Context) error {
 
 		// Otherwise, wait for either the reset time (if in the future) or for any
 		// request to finish, then retry.
-		resetAt := u.lastRLStatus.ResetAt
+		waitTime := time.Until(u.lastRLStatus.ResetAt)
 		u.mu.Unlock()
+		var waitCH <-chan time.Time
+		if waitTime > 0 {
+			waitCH = time.After(waitTime)
+		}
 
-		logger.Debug(ctx, "waiting for rate limit slot",
+		logger.Debug(ctx, "waiting for rate limit slot or other requests to finish",
 			zap.Int("remaining", remaining),
 			zap.Int("limit", u.lastRLStatus.Limit),
 			zap.Time("resetAt", u.lastRLStatus.ResetAt),
@@ -249,9 +257,11 @@ func (u *URLScannerWorker) reserveRL(ctx context.Context) error {
 		case <-u.requestFinishedChan:
 			// loop to re-evaluate
 			continue
-		case <-time.After(time.Until(resetAt)):
+		case <-waitCH:
 			// Reset window elapsed; loop and try again.
 			continue
 		}
 	}
 }
+
+// TODO: add prometheus metrics for workers
