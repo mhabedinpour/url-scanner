@@ -119,7 +119,6 @@ sequenceDiagram
   - controller/: HTTP middlewares (logging, CORS, pprof mux, etc.).
   - domain/: Domain types for scans, results, users, statuses.
   - logger/: Zap-based logger setup with context helpers.
-  - metrics/: Metrics helpers (OpenTelemetry → Prometheus exporter).
   - serrors/: Sentinel errors and wrappers (e.g., ErrBadRequest, ErrNotFound, ErrRateLimited, ErrConflict).
   - storage/: Storage interfaces and implementations.
     - postgres/: PostgreSQL implementation (connections, queries, jobs, scans).
