@@ -214,9 +214,6 @@ func TestHandler_ListScans_CustomLimit_NoNextCursor(t *testing.T) {
 	require.False(t, lst.NextCursor.IsSet(), "next cursor should be unset when empty")
 }
 
-// We cannot directly call unexported functions from another package.
-// Define small exported wrappers in a test-only file within the package under test.
-
 // sampleScan constructs a minimal domain.Scan for tests.
 func sampleScan(userID domain.UserID, rawurl string) domain.Scan {
 	id := uuid.New()

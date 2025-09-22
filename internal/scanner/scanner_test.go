@@ -25,27 +25,21 @@ const (
 	url = "https://example.com/"
 )
 
-func newTestScanner(t *testing.T) (*gomock.Controller, *mockstorage.MockStorage, scanner.Scanner) {
+func newTestScanner(t *testing.T) (
+	*gomock.Controller,
+	*mockstorage.MockStorage,
+	*mockurlscanner.MockClient,
+	scanner.Scanner) {
 	t.Helper()
 
-	ctrl := gomock.NewController(t)
-	st := mockstorage.NewMockStorage(ctrl)
-	s := scanner.New(st, nil, scanner.Options{MaxAttempts: 3, ResultCacheTTL: time.Hour})
-
-	return ctrl, st, s
-}
-
-// Like newTestScanner, but also returns the urlscanner mock for direct expectations.
-func newTestScannerWithURLScanner(t *testing.T) (
-	*mockstorage.MockStorage, *mockurlscanner.MockClient, scanner.Scanner) {
-	t.Helper()
-	logger.Setup("debug")
 	ctrl := gomock.NewController(t)
 	st := mockstorage.NewMockStorage(ctrl)
 	urlClient := mockurlscanner.NewMockClient(ctrl)
 	s := scanner.New(st, urlClient, scanner.Options{MaxAttempts: 3, ResultCacheTTL: time.Hour})
 
-	return st, urlClient, s
+	logger.Setup("debug")
+
+	return ctrl, st, urlClient, s
 }
 
 // helper to wire Storage.WithTx to execute callback with a MockAllStorage.
@@ -70,7 +64,8 @@ func expectWithTx(
 }
 
 func TestScanner_Enqueue_JobAdded(t *testing.T) {
-	ctrl, st, s := newTestScanner(t)
+	ctrl, st, _, s := newTestScanner(t)
+	defer ctrl.Finish()
 
 	userID := domain.UserID{}
 
@@ -98,7 +93,8 @@ func TestScanner_Enqueue_JobAdded(t *testing.T) {
 }
 
 func TestScanner_Enqueue_UsesLastCompletedResult(t *testing.T) {
-	ctrl, st, s := newTestScanner(t)
+	ctrl, st, _, s := newTestScanner(t)
+	defer ctrl.Finish()
 
 	userID := domain.UserID{}
 	completed := domain.Scan{Result: domain.ScanResult{}}
@@ -134,7 +130,8 @@ func TestScanner_Enqueue_UsesLastCompletedResult(t *testing.T) {
 }
 
 func TestScanner_Enqueue_PendingWhenJobExistsWithoutResult(t *testing.T) {
-	ctrl, st, s := newTestScanner(t)
+	ctrl, st, _, s := newTestScanner(t)
+	defer ctrl.Finish()
 	userID := domain.UserID{}
 
 	expectWithTx(t, ctrl, st, func(tx *mockstorage.MockAllStorage) {
@@ -156,8 +153,8 @@ func TestScanner_Enqueue_PendingWhenJobExistsWithoutResult(t *testing.T) {
 }
 
 func TestScanner_Enqueue_InvalidURL(t *testing.T) {
-	_, st, s := newTestScanner(t)
-	// No storage calls expected
+	ctrl, st, _, s := newTestScanner(t)
+	defer ctrl.Finish()
 
 	_, err := s.Enqueue(context.Background(), domain.UserID{}, "http://[::1")
 	require.Error(t, err)
@@ -167,7 +164,8 @@ func TestScanner_Enqueue_InvalidURL(t *testing.T) {
 }
 
 func TestScanner_Enqueue_PropagatesErrors(t *testing.T) {
-	ctrl, st, s := newTestScanner(t)
+	ctrl, st, _, s := newTestScanner(t)
+	defer ctrl.Finish()
 	userID := domain.UserID{}
 
 	// error from StoreScans
@@ -214,7 +212,8 @@ func TestScanner_Enqueue_PropagatesErrors(t *testing.T) {
 }
 
 func TestScanner_UserScans_SuccessAndPagination(t *testing.T) {
-	_, st, s := newTestScanner(t)
+	ctrl, st, _, s := newTestScanner(t)
+	defer ctrl.Finish()
 	userID := domain.UserID{}
 	status := domain.ScanStatusPending
 	cursorTime := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
@@ -239,14 +238,16 @@ func TestScanner_UserScans_SuccessAndPagination(t *testing.T) {
 }
 
 func TestScanner_UserScans_InvalidCursor(t *testing.T) {
-	_, _, s := newTestScanner(t)
+	ctrl, _, _, s := newTestScanner(t)
+	defer ctrl.Finish()
 	_, _, err := s.UserScans(context.Background(), domain.UserID{}, "", "not-a-time", 5)
 	require.Error(t, err)
 	require.ErrorIs(t, err, serrors.ErrBadRequest)
 }
 
 func TestScanner_Result(t *testing.T) {
-	_, st, s := newTestScanner(t)
+	ctrl, st, _, s := newTestScanner(t)
+	defer ctrl.Finish()
 	userID := domain.UserID{}
 	id := domain.ScanID{}
 
@@ -270,7 +271,8 @@ func TestScanner_Result(t *testing.T) {
 }
 
 func TestScanner_Delete(t *testing.T) {
-	_, st, s := newTestScanner(t)
+	ctrl, st, _, s := newTestScanner(t)
+	defer ctrl.Finish()
 	userID := domain.UserID{}
 	id := domain.ScanID{}
 
@@ -287,10 +289,10 @@ func TestScanner_Delete(t *testing.T) {
 	require.Error(t, s.Delete(context.Background(), userID, id))
 }
 
-// ----------------------- Tests for Scan -----------------------
-
 func TestScanner_Scan_NoPendingConflict(t *testing.T) {
-	st, urlClient, s := newTestScannerWithURLScanner(t)
+	ctrl, st, urlClient, s := newTestScanner(t)
+	defer ctrl.Finish()
+
 	// no pending scans
 	st.EXPECT().PendingScanCountByURL(gomock.Any(), url).Return(int64(0), nil)
 	// ensure urlscanner is not called
@@ -302,14 +304,18 @@ func TestScanner_Scan_NoPendingConflict(t *testing.T) {
 }
 
 func TestScanner_Scan_PendingCountError(t *testing.T) {
-	st, _, s := newTestScannerWithURLScanner(t)
+	ctrl, st, _, s := newTestScanner(t)
+	defer ctrl.Finish()
+
 	st.EXPECT().PendingScanCountByURL(gomock.Any(), url).Return(int64(0), errors.New("count boom"))
 	_, err := s.Scan(context.Background(), url)
 	require.Error(t, err)
 }
 
 func TestScanner_Scan_Success(t *testing.T) {
-	st, urlClient, s := newTestScannerWithURLScanner(t)
+	ctrl, st, urlClient, s := newTestScanner(t)
+	defer ctrl.Finish()
+
 	st.EXPECT().PendingScanCountByURL(gomock.Any(), url).Return(int64(2), nil)
 	// urlscanner returns ID and RL
 	rl := urlscanner.RateLimitStatus{Limit: 100, Remaining: 50, ResetAt: time.Now()}
@@ -332,7 +338,9 @@ func TestScanner_Scan_Success(t *testing.T) {
 }
 
 func TestScanner_Scan_SubmitErrorUpdatesFailed(t *testing.T) {
-	st, urlClient, s := newTestScannerWithURLScanner(t)
+	ctrl, st, urlClient, s := newTestScanner(t)
+	defer ctrl.Finish()
+
 	st.EXPECT().PendingScanCountByURL(gomock.Any(), url).Return(int64(1), nil)
 	// submit fails
 	rl := urlscanner.RateLimitStatus{Limit: 100, Remaining: 0, ResetAt: time.Now()}
@@ -353,7 +361,9 @@ func TestScanner_Scan_SubmitErrorUpdatesFailed(t *testing.T) {
 }
 
 func TestScanner_Scan_RateLimitedNoFailedUpdate(t *testing.T) {
-	st, urlClient, s := newTestScannerWithURLScanner(t)
+	ctrl, st, urlClient, s := newTestScanner(t)
+	defer ctrl.Finish()
+
 	st.EXPECT().PendingScanCountByURL(gomock.Any(), url).Return(int64(1), nil)
 	// simulate rate-limited error on submit; submit can return wrapped rate-limit error
 	rl := urlscanner.RateLimitStatus{Limit: 100, Remaining: 0, ResetAt: time.Now()}
@@ -369,7 +379,9 @@ func TestScanner_Scan_RateLimitedNoFailedUpdate(t *testing.T) {
 }
 
 func TestScanner_Scan_UpdateOnSuccessError(t *testing.T) {
-	st, urlClient, s := newTestScannerWithURLScanner(t)
+	ctrl, st, urlClient, s := newTestScanner(t)
+	defer ctrl.Finish()
+
 	st.EXPECT().PendingScanCountByURL(gomock.Any(), url).Return(int64(1), nil)
 	// submit ok
 	rl := urlscanner.RateLimitStatus{Limit: 100, Remaining: 50, ResetAt: time.Now()}
